@@ -1,0 +1,2282 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "个人博客系统 API",
+    "version": "1.0.0",
+    "description": "基于 Next.js 的全栈个人博客系统 API 接口文档",
+    "contact": {
+      "name": "技术团队",
+      "email": "admin@blog.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.blog.com/api/v1",
+      "description": "生产环境"
+    },
+    {
+      "url": "http://localhost:3000/api/v1",
+      "description": "开发环境"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT 认证 Token"
+      }
+    },
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200,
+            "description": "业务状态码"
+          },
+          "message": {
+            "type": "string",
+            "example": "success",
+            "description": "响应消息"
+          },
+          "data": {
+            "description": "响应数据"
+          },
+          "timestamp": {
+            "type": "integer",
+            "example": 1707219200000,
+            "description": "响应时间戳（毫秒）"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 400
+          },
+          "message": {
+            "type": "string",
+            "example": "请求参数错误"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "integer",
+            "example": 1707219200000
+          }
+        }
+      },
+      "PaginatedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array"
+          },
+          "total": {
+            "type": "integer",
+            "description": "总记录数"
+          },
+          "page": {
+            "type": "integer",
+            "description": "当前页码"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页数量"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "总页数"
+          }
+        }
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "文章 ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "标题"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL 标识符"
+          },
+          "content": {
+            "type": "string",
+            "description": "Markdown 内容"
+          },
+          "summary": {
+            "type": "string",
+            "description": "摘要"
+          },
+          "coverImage": {
+            "type": "string",
+            "description": "封面图 URL"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "PUBLISHED", "ARCHIVED"],
+            "description": "状态"
+          },
+          "viewCount": {
+            "type": "integer",
+            "description": "浏览量"
+          },
+          "likeCount": {
+            "type": "integer",
+            "description": "点赞数"
+          },
+          "commentCount": {
+            "type": "integer",
+            "description": "评论数"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "发布时间"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          "author": {
+            "$ref": "#/components/schemas/Author"
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "postCount": {
+            "type": "integer"
+          }
+        }
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "postCount": {
+            "type": "integer"
+          }
+        }
+      },
+      "Author": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string"
+          }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string"
+          },
+          "likeCount": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "APPROVED", "REJECTED"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            }
+          }
+        }
+      },
+      "CreatePostRequest": {
+        "type": "object",
+        "required": ["title", "content"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "标题（1-200 字）"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL 标识符（自动生成）"
+          },
+          "content": {
+            "type": "string",
+            "description": "Markdown 内容"
+          },
+          "summary": {
+            "type": "string",
+            "description": "摘要（自动提取）"
+          },
+          "coverImage": {
+            "type": "string",
+            "format": "uri",
+            "description": "封面图 URL"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "分类 ID"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "标签 ID 数组"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "PUBLISHED", "ARCHIVED"],
+            "description": "状态"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "发布时间（ISO 8601）"
+          }
+        }
+      },
+      "CreateCommentRequest": {
+        "type": "object",
+        "required": ["content", "nickname"],
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "评论内容（1-500 字）"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "昵称"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "邮箱（用于 Gravatar 头像）"
+          },
+          "website": {
+            "type": "string",
+            "format": "uri",
+            "description": "个人网站"
+          },
+          "parentId": {
+            "type": "string",
+            "description": "父评论 ID（回复时使用）"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "avatar": {
+                "type": "string"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/posts": {
+      "get": {
+        "tags": ["前台-文章"],
+        "summary": "获取文章列表",
+        "description": "获取已发布的文章列表",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tagId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaginatedResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{slug}": {
+      "get": {
+        "tags": ["前台-文章"],
+        "summary": "获取文章详情",
+        "description": "根据 slug 获取文章详情",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Post"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/like": {
+      "post": {
+        "tags": ["前台-文章"],
+        "summary": "点赞文章",
+        "description": "点赞文章（需要防刷限制）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "点赞成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "likeCount": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/trending": {
+      "get": {
+        "tags": ["前台-文章"],
+        "summary": "获取热门文章",
+        "description": "获取热门文章排行榜",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["day", "week", "month", "all"],
+              "default": "all"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Post"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{postId}/comments": {
+      "get": {
+        "tags": ["前台-评论"],
+        "summary": "获取评论列表",
+        "description": "获取文章评论列表",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["createdAt", "likeCount"],
+              "default": "createdAt"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaginatedResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["前台-评论"],
+        "summary": "提交评论",
+        "description": "提交文章评论",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "提交成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Comment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "数据验证失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["前台-分类"],
+        "summary": "获取分类列表",
+        "description": "获取所有文章分类",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Category"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories/{slug}": {
+      "get": {
+        "tags": ["前台-分类"],
+        "summary": "获取分类详情",
+        "description": "获取分类详情及文章列表",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Category"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tags": {
+      "get": {
+        "tags": ["前台-标签"],
+        "summary": "获取标签列表",
+        "description": "获取所有文章标签",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Tag"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "tags": ["前台-搜索"],
+        "summary": "搜索文章",
+        "description": "全文搜索文章",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaginatedResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["后台-认证"],
+        "summary": "管理员登录",
+        "description": "管理员登录获取 Token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/LoginResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["后台-认证"],
+        "summary": "获取当前用户信息",
+        "description": "获取当前登录用户信息",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "email": {
+                              "type": "string"
+                            },
+                            "avatar": {
+                              "type": "string"
+                            },
+                            "roles": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "permissions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["后台-认证"],
+        "summary": "登出",
+        "description": "登出（使 Token 失效）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "登出成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/posts": {
+      "get": {
+        "tags": ["后台-文章管理"],
+        "summary": "获取文章列表（后台）",
+        "description": "获取所有文章（包括草稿）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["DRAFT", "PUBLISHED", "ARCHIVED"]
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "authorId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaginatedResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["后台-文章管理"],
+        "summary": "创建文章",
+        "description": "创建新文章",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Post"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "数据验证失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/posts/{id}": {
+      "put": {
+        "tags": ["后台-文章管理"],
+        "summary": "更新文章",
+        "description": "更新文章信息",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Post"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["后台-文章管理"],
+        "summary": "删除文章",
+        "description": "删除文章（软删除）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/posts/batch-delete": {
+      "post": {
+        "tags": ["后台-文章管理"],
+        "summary": "批量删除文章",
+        "description": "批量删除文章",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ids"],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/posts/{id}/publish": {
+      "post": {
+        "tags": ["后台-文章管理"],
+        "summary": "发布文章",
+        "description": "发布文章（DRAFT → PUBLISHED）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "发布成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "publishedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/comments": {
+      "get": {
+        "tags": ["后台-评论管理"],
+        "summary": "获取评论列表（后台）",
+        "description": "获取所有评论（包括待审核）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["PENDING", "APPROVED", "REJECTED"]
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaginatedResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/comments/{id}/review": {
+      "post": {
+        "tags": ["后台-评论管理"],
+        "summary": "审核评论",
+        "description": "审核通过或拒绝评论",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["action"],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["approve", "reject"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "审核成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Comment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/comments/batch-review": {
+      "post": {
+        "tags": ["后台-评论管理"],
+        "summary": "批量审核评论",
+        "description": "批量审核评论",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ids", "action"],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": ["approve", "reject"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "审核成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/comments/{id}": {
+      "delete": {
+        "tags": ["后台-评论管理"],
+        "summary": "删除评论",
+        "description": "删除评论",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/categories": {
+      "post": {
+        "tags": ["后台-分类管理"],
+        "summary": "创建分类",
+        "description": "创建文章分类",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Category"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/categories/{id}": {
+      "put": {
+        "tags": ["后台-分类管理"],
+        "summary": "更新分类",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["后台-分类管理"],
+        "summary": "删除分类",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/tags": {
+      "post": {
+        "tags": ["后台-标签管理"],
+        "summary": "创建标签",
+        "description": "创建文章标签",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Tag"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/dashboard/stats": {
+      "get": {
+        "tags": ["后台-数据统计"],
+        "summary": "获取仪表盘数据",
+        "description": "获取后台仪表盘统计数据",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "overview": {
+                              "type": "object",
+                              "properties": {
+                                "totalPosts": {
+                                  "type": "integer"
+                                },
+                                "publishedPosts": {
+                                  "type": "integer"
+                                },
+                                "totalComments": {
+                                  "type": "integer"
+                                },
+                                "totalViews": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "popularPosts": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Post"
+                              }
+                            },
+                            "recentComments": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Comment"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/stats/views/trend": {
+      "get": {
+        "tags": ["后台-数据统计"],
+        "summary": "获取阅读量趋势",
+        "description": "获取阅读量趋势数据",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["7d", "30d", "90d", "1y"],
+              "default": "7d"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "views": {
+                                    "type": "integer"
+                                  }
+                                }
+                              }
+                            },
+                            "total": {
+                              "type": "integer"
+                            },
+                            "average": {
+                              "type": "integer"
+                            },
+                            "growth": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "tags": ["后台-系统设置"],
+        "summary": "获取系统配置",
+        "description": "获取系统配置",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "site": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "seo": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["后台-系统设置"],
+        "summary": "更新系统配置",
+        "description": "更新系统配置",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "site": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "seo": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/upload/image": {
+      "post": {
+        "tags": ["后台-文件上传"],
+        "summary": "上传图片",
+        "description": "上传图片（支持拖拽、粘贴）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["post", "avatar", "category"],
+                    "description": "类型（post, avatar, category）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "上传成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string"
+                            },
+                            "filename": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "type": "integer"
+                            },
+                            "width": {
+                              "type": "integer"
+                            },
+                            "height": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "前台-文章",
+      "description": "前台文章相关接口"
+    },
+    {
+      "name": "前台-评论",
+      "description": "前台评论相关接口"
+    },
+    {
+      "name": "前台-分类",
+      "description": "前台分类相关接口"
+    },
+    {
+      "name": "前台-标签",
+      "description": "前台标签相关接口"
+    },
+    {
+      "name": "前台-搜索",
+      "description": "前台搜索相关接口"
+    },
+    {
+      "name": "后台-认证",
+      "description": "后台认证相关接口"
+    },
+    {
+      "name": "后台-文章管理",
+      "description": "后台文章管理接口"
+    },
+    {
+      "name": "后台-评论管理",
+      "description": "后台评论管理接口"
+    },
+    {
+      "name": "后台-分类管理",
+      "description": "后台分类管理接口"
+    },
+    {
+      "name": "后台-标签管理",
+      "description": "后台标签管理接口"
+    },
+    {
+      "name": "后台-数据统计",
+      "description": "后台数据统计接口"
+    },
+    {
+      "name": "后台-系统设置",
+      "description": "后台系统设置接口"
+    },
+    {
+      "name": "后台-文件上传",
+      "description": "后台文件上传接口"
+    }
+  ]
+}
