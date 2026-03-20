@@ -1,9 +1,9 @@
 # 个人博客系统 — API 接口文档
 
-版本：v1.1
-日期：2026-03-18
+版本：v1.2
+日期：2026-03-19
 状态：已更新
-更新说明：同步需求文档和技术设计文档，修正单分类设计，补充验证码、敏感词等接口
+更新说明：规范业务状态码为四位数字，与 HTTP 状态码清晰区分
 
 ---
 
@@ -32,7 +32,7 @@
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {},
   "timestamp": 1707219200000
@@ -43,24 +43,61 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `code` | Number | 业务状态码 |
+| `code` | Number | 业务状态码（四位数字，与 HTTP 状态码独立） |
 | `message` | String | 响应消息 |
 | `data` | Any | 响应数据 |
 | `timestamp` | Number | 响应时间戳（毫秒） |
 
+**HTTP 状态码与业务状态码的区别：**
+
+| 层面 | HTTP 状态码 | 业务状态码（code） |
+|------|-------------|-------------------|
+| 作用 | 传输层状态，表示 HTTP 请求是否成功 | 应用层状态，表示业务逻辑处理结果 |
+| 标准 | 遵循 HTTP 协议标准（RFC 7231） | 自定义业务规范（四位数字） |
+| 示例 | 200, 404, 500 | 2000, 4040, 5000 |
+| 用途 | 客户端判断请求传输状态 | 前端判断业务处理结果，展示对应提示 |
+
 ### 1.3 HTTP 状态码
 
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 请求成功 |
-| 201 | 创建成功 |
-| 400 | 请求参数错误 |
-| 401 | 未认证 |
-| 403 | 无权限 |
-| 404 | 资源不存在 |
-| 422 | 数据验证失败 |
-| 429 | 请求过于频繁 |
-| 500 | 服务器内部错误 |
+**注意**：HTTP 状态码与业务状态码（code）是独立的两个概念。HTTP 状态码表示传输层状态，业务状态码表示应用层业务逻辑处理结果。
+
+| HTTP 状态码 | 说明 | 业务状态码（code）示例 |
+|--------|------|----------------------|
+| 200 | 请求成功 | 2000（成功） |
+| 201 | 创建成功 | 2010（创建成功） |
+| 400 | 请求参数错误 | 4000（请求参数错误） |
+| 401 | 未认证 | 4010（未认证） |
+| 403 | 无权限 | 4030（无权限） |
+| 404 | 资源不存在 | 4040（资源不存在） |
+| 422 | 数据验证失败 | 4220（数据验证失败） |
+| 429 | 请求过于频繁 | 4290（请求过于频繁） |
+| 500 | 服务器内部错误 | 5000（服务器内部错误） |
+
+**示例**：
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "code": 2000,
+  "message": "success",
+  "data": {},
+  "timestamp": 1707219200000
+}
+```
+
+```http
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+
+{
+  "code": 4010,
+  "message": "未认证",
+  "data": null,
+  "timestamp": 1707219200000
+}
+```
 
 ### 1.4 分页参数
 
@@ -75,7 +112,7 @@
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [],
@@ -139,7 +176,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [
@@ -199,7 +236,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "id": "cm123456789",
@@ -264,7 +301,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "已点赞",
   "data": {
     "likeCount": 57,
@@ -278,7 +315,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 429,
+  "code": 4290,
   "message": "已点过赞了",
   "data": null,
   "timestamp": 1707219200000
@@ -301,7 +338,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "viewCount": 1235,
@@ -338,7 +375,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [
@@ -410,7 +447,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "评论提交成功，等待审核后将显示",
   "data": {
     "id": "cm111111113",
@@ -428,7 +465,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 422,
+  "code": 4220,
   "message": "验证码错误，请重新输入",
   "data": null,
   "timestamp": 1707219200000
@@ -437,7 +474,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 429,
+  "code": 4290,
   "message": "评论太频繁，请稍后再试",
   "data": {
     "retryAfter": 60
@@ -462,7 +499,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "已点赞",
   "data": {
     "likeCount": 6,
@@ -490,7 +527,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "captchaId": "cm123456789",
@@ -528,7 +565,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": [
     {
@@ -573,7 +610,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "id": "cm987654321",
@@ -614,7 +651,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": [
     {
@@ -654,7 +691,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [
@@ -680,7 +717,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [],
@@ -712,7 +749,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": [
     {
@@ -753,7 +790,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "year": 2026,
@@ -853,7 +890,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "登录成功",
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -874,7 +911,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 401,
+  "code": 4010,
   "message": "用户名或密码错误，请重新输入",
   "data": null,
   "timestamp": 1707219200000
@@ -883,7 +920,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 429,
+  "code": 4290,
   "message": "登录失败次数过多，请 15 分钟后再试",
   "data": {
     "retryAfter": 900
@@ -902,7 +939,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "id": "cm000000001",
@@ -937,7 +974,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "登出成功",
   "data": null,
   "timestamp": 1707219200000
@@ -967,7 +1004,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [
@@ -1048,7 +1085,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 201,
+  "code": 2010,
   "message": "创建成功",
   "data": {
     "id": "cm123456789",
@@ -1079,7 +1116,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "更新成功",
   "data": {
     "id": "cm123456789",
@@ -1108,7 +1145,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "删除成功，可在回收站恢复（保留 30 天）",
   "data": null,
   "timestamp": 1707219200000
@@ -1133,7 +1170,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "成功删除 3 篇文章",
   "data": {
     "count": 3
@@ -1158,7 +1195,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "发布成功",
   "data": {
     "id": "cm123456789",
@@ -1187,7 +1224,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "保存成功",
   "data": {
     "id": "cm123456789",
@@ -1214,7 +1251,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "恢复成功",
   "data": {
     "id": "cm123456789",
@@ -1246,7 +1283,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [
@@ -1307,7 +1344,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "审核通过",
   "data": {
     "id": "cm111111111",
@@ -1336,7 +1373,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "成功审核 3 条评论",
   "data": {
     "count": 3
@@ -1361,7 +1398,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "删除成功",
   "data": null,
   "timestamp": 1707219200000
@@ -1398,7 +1435,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 201,
+  "code": 2010,
   "message": "创建成功",
   "data": {
     "id": "cm987654321",
@@ -1425,7 +1462,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 409,
+  "code": 4090,
   "message": "该分类下有 5 篇文章，请先移动或删除这些文章",
   "data": {
     "postCount": 5
@@ -1455,7 +1492,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 201,
+  "code": 2010,
   "message": "创建成功",
   "data": {
     "id": "cm111111111",
@@ -1481,7 +1518,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "删除成功",
   "data": null,
   "timestamp": 1707219200000
@@ -1511,7 +1548,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [
@@ -1552,7 +1589,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 201,
+  "code": 2010,
   "message": "创建成功",
   "data": {
     "id": "cm123456789",
@@ -1574,7 +1611,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "删除成功",
   "data": null,
   "timestamp": 1707219200000
@@ -1599,7 +1636,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "成功导入 100 个敏感词",
   "data": {
     "imported": 100,
@@ -1621,7 +1658,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "overview": {
@@ -1677,7 +1714,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "timeline": [
@@ -1715,7 +1752,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": [
     {
@@ -1742,7 +1779,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "site": {
@@ -1781,7 +1818,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "更新成功",
   "data": null,
   "timestamp": 1707219200000
@@ -1816,7 +1853,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "上传成功",
   "data": {
     "url": "https://cdn.blog.com/images/xxx.jpg",
@@ -1852,7 +1889,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "success",
   "data": {
     "items": [
@@ -1897,25 +1934,27 @@ Cache-Control: public, max-age=600
 
 ### 4.1 业务状态码
 
-| 状态码 | 说明 | 示例 |
-|--------|------|------|
-| 200 | 成功 | 请求成功 |
-| 201 | 创建成功 | 文章创建成功 |
-| 400 | 请求参数错误 | 缺少必填参数 |
-| 401 | 未认证 | Token 无效或过期 |
-| 403 | 无权限 | 权限不足 |
-| 404 | 资源不存在 | 文章不存在 |
-| 409 | 资源冲突 | slug 已存在 |
-| 422 | 数据验证失败 | 邮箱格式错误 |
-| 429 | 请求过于频繁 | 触发限流 |
-| 500 | 服务器内部错误 | 服务器异常 |
-| 503 | 服务不可用 | 系统维护中 |
+**注意**：业务状态码为四位数字，与 HTTP 状态码独立。HTTP 状态码表示传输层状态，业务状态码表示应用层业务逻辑处理结果。
+
+| 业务状态码（code） | HTTP 状态码 | 说明 | 示例 |
+|--------|--------|------|------|
+| 2000 | 200 | 成功 | 请求成功 |
+| 2010 | 201 | 创建成功 | 文章创建成功 |
+| 4000 | 400 | 请求参数错误 | 缺少必填参数 |
+| 4010 | 401 | 未认证 | Token 无效或过期 |
+| 4030 | 403 | 无权限 | 权限不足 |
+| 4040 | 404 | 资源不存在 | 文章不存在 |
+| 4090 | 409 | 资源冲突 | slug 已存在 |
+| 4220 | 422 | 数据验证失败 | 邮箱格式错误 |
+| 4290 | 429 | 请求过于频繁 | 触发限流 |
+| 5000 | 500 | 服务器内部错误 | 服务器异常 |
+| 5030 | 503 | 服务不可用 | 系统维护中 |
 
 ### 4.2 错误响应格式
 
 ```json
 {
-  "code": 400,
+  "code": 4000,
   "message": "请求参数错误",
   "data": {
     "errors": [
@@ -1939,7 +1978,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 401,
+  "code": 4010,
   "message": "用户名或密码错误，请重新输入",
   "data": null,
   "timestamp": 1707219200000
@@ -1948,7 +1987,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 401,
+  "code": 4010,
   "message": "验证码错误，请重新输入",
   "data": null,
   "timestamp": 1707219200000
@@ -1957,7 +1996,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 401,
+  "code": 4010,
   "message": "验证码已过期，请点击刷新",
   "data": null,
   "timestamp": 1707219200000
@@ -1966,7 +2005,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 429,
+  "code": 4290,
   "message": "登录失败次数过多，请 15 分钟后再试",
   "data": {
     "retryAfter": 900
@@ -1977,7 +2016,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 401,
+  "code": 4010,
   "message": "会话已过期，请重新登录",
   "data": null,
   "timestamp": 1707219200000
@@ -1988,7 +2027,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 422,
+  "code": 4220,
   "message": "标题不能为空",
   "data": {
     "errors": [
@@ -2004,7 +2043,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 422,
+  "code": 4220,
   "message": "标题长度不能超过 200 字符",
   "data": {
     "errors": [
@@ -2020,7 +2059,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 500,
+  "code": 5000,
   "message": "保存失败，请检查网络连接后重试",
   "data": null,
   "timestamp": 1707219200000
@@ -2029,7 +2068,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 500,
+  "code": 5000,
   "message": "发布失败，请检查网络连接后重试",
   "data": null,
   "timestamp": 1707219200000
@@ -2038,7 +2077,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 404,
+  "code": 4040,
   "message": "文章不存在或已被删除",
   "data": null,
   "timestamp": 1707219200000
@@ -2049,7 +2088,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 422,
+  "code": 4220,
   "message": "请输入昵称",
   "data": null,
   "timestamp": 1707219200000
@@ -2058,7 +2097,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 422,
+  "code": 4220,
   "message": "昵称长度不能超过 20 字符",
   "data": null,
   "timestamp": 1707219200000
@@ -2067,7 +2106,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 422,
+  "code": 4220,
   "message": "请输入评论内容",
   "data": null,
   "timestamp": 1707219200000
@@ -2076,7 +2115,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 422,
+  "code": 4220,
   "message": "评论内容不能超过 500 字",
   "data": null,
   "timestamp": 1707219200000
@@ -2085,7 +2124,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 429,
+  "code": 4290,
   "message": "评论太频繁，请稍后再试",
   "data": {
     "retryAfter": 60
@@ -2098,7 +2137,8 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 500,
+  "code": 5000,
+  
   "message": "网络连接失败，请检查网络设置",
   "data": null,
   "timestamp": 1707219200000
@@ -2107,7 +2147,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 500,
+  "code": 5000,
   "message": "服务器开小差了，请稍后再试",
   "data": null,
   "timestamp": 1707219200000
@@ -2116,7 +2156,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 403,
+  "code": 4030,
   "message": "权限不足，无法执行此操作",
   "data": {
     "requiredPermission": "post:delete"
@@ -2127,7 +2167,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 404,
+  "code": 4040,
   "message": "数据加载失败，请刷新页面重试",
   "data": null,
   "timestamp": 1707219200000
@@ -2138,7 +2178,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "登录成功，欢迎回来！",
   "data": {...},
   "timestamp": 1707219200000
@@ -2147,7 +2187,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "保存成功",
   "data": {...},
   "timestamp": 1707219200000
@@ -2156,7 +2196,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "发布成功",
   "data": {...},
   "timestamp": 1707219200000
@@ -2165,7 +2205,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "删除成功",
   "data": null,
   "timestamp": 1707219200000
@@ -2174,7 +2214,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "审核通过",
   "data": {...},
   "timestamp": 1707219200000
@@ -2183,7 +2223,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "已点赞",
   "data": {...},
   "timestamp": 1707219200000
@@ -2192,7 +2232,7 @@ Cache-Control: public, max-age=600
 
 ```json
 {
-  "code": 200,
+  "code": 2000,
   "message": "链接已复制",
   "data": null,
   "timestamp": 1707219200000
@@ -2270,6 +2310,7 @@ API 版本通过 URL 路径进行管理：
 |------|------|---------|
 | v1.0 | 2026-02-26 | 初始版本 |
 | v1.1 | 2026-03-18 | 同步需求和设计文档：修正单分类设计、补充验证码接口、敏感词管理接口、文章 SEO 字段、软删除状态、评论点赞功能、错误响应文案规范 |
+| v1.2 | 2026-03-19 | 规范业务状态码为四位数字（末尾加 0），与 HTTP 状态码清晰区分：200→2000、401→4010、429→4290 等，补充 HTTP 状态码与业务码区别说明 |
 
 ---
 
@@ -2316,6 +2357,6 @@ API 版本通过 URL 路径进行管理：
 
 ---
 
-**文档更新日期：** 2026-03-18
-**文档版本：** v1.1
+**文档更新日期：** 2026-03-19
+**文档版本：** v1.2
 **文档维护者：** 技术团队
