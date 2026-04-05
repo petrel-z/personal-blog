@@ -5,6 +5,8 @@
 import { NextResponse } from 'next/server'
 import { getOverviewStats, getTrendingPosts, getViewStats } from '@/server/features/stats'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/stats
 export async function GET(request: Request) {
   try {

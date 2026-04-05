@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'motion/react'
@@ -12,7 +12,7 @@ import { Search as SearchIcon, X } from 'lucide-react'
 import { articles } from '../_components/mock/data'
 import { RightWidgets } from '../_components/RightWidgets'
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams()
   const initialQuery = searchParams.get('q') || ''
 
@@ -213,5 +213,31 @@ function SearchResultCard({
         </div>
       </div>
     </article>
+  )
+}
+
+function SearchFallback() {
+  return (
+    <div className="p-4 sm:p-6 flex gap-6 max-w-7xl mx-auto">
+      <div className="flex-1 min-w-0 space-y-4">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-text-main">搜索</h1>
+        </div>
+        <div className="h-12 bg-sidebar rounded-lg animate-pulse" />
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-sidebar rounded-lg animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchFallback />}>
+      <SearchContent />
+    </Suspense>
   )
 }
