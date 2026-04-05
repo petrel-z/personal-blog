@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const type = searchParams.get('type') || 'overview'
     const timeframe = (searchParams.get('timeframe') as 'all' | 'month' | 'week') || 'all'
 
-    if (type === 'trending') {
+    if (type === 'trending' || type === 'popular') {
       const posts = await getTrendingPosts(timeframe)
       return NextResponse.json({ success: true, data: posts })
     }

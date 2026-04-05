@@ -7,11 +7,8 @@ import { useAuth } from '../../_components'
 import type { PostWithRelations } from '@/shared/types'
 
 interface OverviewStats {
-  totalPosts: number
-  publishedPosts: number
-  draftPosts: number
-  totalComments: number
-  pendingComments: number
+  postCount: number
+  commentCount: number
   totalViews: number
   totalLikes: number
 }
@@ -47,8 +44,8 @@ export default function DashboardPage() {
       // Fetch all data in parallel
       const [statsResult, popularResult, commentsResult] = await Promise.all([
         api.get<OverviewStats>('/stats'),
-        api.get<PostWithRelations[]>('/stats/popular', { period: '7d' }),
-        api.get<RecentComment[]>('/comments', { pageSize: 5 }),
+        api.get<PostWithRelations[]>('/stats', { type: 'popular', timeframe: 'week' }),
+        api.get<RecentComment[]>('/comments/admin', { pageSize: 5 }),
       ])
 
       if (statsResult.success && statsResult.data) {
@@ -97,12 +94,9 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">文章总数</p>
-              <p className="text-2xl font-bold">{stats?.totalPosts || 0}</p>
+              <p className="text-2xl font-bold">{stats?.postCount || 0}</p>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            {stats?.publishedPosts || 0} 已发布 / {stats?.draftPosts || 0} 草稿
-          </p>
         </div>
 
         <div className="p-4 border rounded-lg bg-card">
@@ -114,12 +108,9 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">评论总数</p>
-              <p className="text-2xl font-bold">{stats?.totalComments || 0}</p>
+              <p className="text-2xl font-bold">{stats?.commentCount || 0}</p>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            {stats?.pendingComments || 0} 待审核
-          </p>
         </div>
 
         <div className="p-4 border rounded-lg bg-card">
@@ -284,9 +275,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="font-medium">评论审核</p>
-              <p className="text-xs text-muted-foreground">
-                {stats?.pendingComments || 0} 条待审核
-              </p>
+              <p className="text-xs text-muted-foreground">查看待审核评论</p>
             </div>
           </Link>
 

@@ -5,6 +5,30 @@
 import { prisma } from '@/server/db'
 import { CreateCommentInput } from './comment.types'
 import { CommentStatus } from '@prisma/client'
+import { checkSensitiveWords } from '../sensitive-word'
+import { getSettingByKey } from '../settings'
+
+// Rate limiting: 1 comment per minute per IP
+const commentRateLimit = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
+const MAX_COMMENTS_PER_WINDOW = 1
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const record = commentRateLimit.get(ip)
+
+  if (!record || record.resetAt < now) {
+    commentRateLimit.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
+    return true
+  }
+
+  if (record.count >= MAX_COMMENTS_PER_WINDOW) {
+    return false
+  }
+
+  record.count++
+  return true
+}
 
 export async function getComments(params: {
   postId?: string
@@ -42,10 +66,32 @@ export async function getComments(params: {
   }
 }
 
-export async function createComment(data: CreateCommentInput) {
-  // TODO: 验证码校验
-  // TODO: 敏感词检查
-  // TODO: 频率限制
+export async function createComment(data: CreateCommentInput): Promise<{
+  success: boolean
+  message: string
+  comment?: any
+  needsApproval?: boolean
+}> {
+  // Rate limiting check
+  if (data.ip && !checkRateLimit(data.ip)) {
+    return {
+      success: false,
+      message: '评论过于频繁，请稍后再试',
+    }
+  }
+
+  // Sensitive word check
+  const hasSensitiveWord = await checkSensitiveWords(data.content)
+  if (hasSensitiveWord) {
+    return {
+      success: false,
+      message: '评论包含敏感词，请修改后重试',
+    }
+  }
+
+  // Check auto-approve setting
+  const autoApprove = await getSettingByKey('autoApproveComments')
+  const shouldAutoApprove = autoApprove === 'true' || autoApprove === '1'
 
   const comment = await prisma.comment.create({
     data: {
@@ -55,17 +101,32 @@ export async function createComment(data: CreateCommentInput) {
       content: data.content,
       postId: data.postId,
       parentId: data.parentId || null,
-      status: 'PENDING', // 默认待审核
+      ip: data.ip || null,
+      userAgent: data.userAgent || null,
+      status: shouldAutoApprove ? CommentStatus.APPROVED : CommentStatus.PENDING,
     },
   })
 
-  // 更新文章评论数
-  await prisma.post.update({
-    where: { id: data.postId },
-    data: { commentCount: { increment: 1 } },
-  })
+  // Update post comment count and return for approved comments
+  if (shouldAutoApprove) {
+    await prisma.post.update({
+      where: { id: data.postId },
+      data: { commentCount: { increment: 1 } },
+    })
+    return {
+      success: true,
+      message: '评论发布成功',
+      comment,
+      needsApproval: false,
+    }
+  }
 
-  return comment
+  return {
+    success: true,
+    message: '评论提交成功，等待审核',
+    comment,
+    needsApproval: true,
+  }
 }
 
 export async function moderateComment(id: string, action: 'approve' | 'reject') {

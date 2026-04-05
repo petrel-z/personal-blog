@@ -10,6 +10,9 @@ export interface CreateCommentInput {
   content: string
   captcha: string
   parentId?: string
+  captchaId?: string
+  ip?: string
+  userAgent?: string
 }
 
 export interface CommentListParams {
@@ -21,4 +24,11 @@ export interface CommentListParams {
 export interface CommentModerateParams {
   id: string
   action: 'approve' | 'reject'
+}
+
+export interface CreateCommentResult {
+  success: boolean
+  message: string
+  comment?: any
+  needsApproval?: boolean
 }

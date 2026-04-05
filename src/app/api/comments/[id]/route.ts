@@ -7,6 +7,8 @@
 import { NextResponse } from 'next/server'
 import { deleteComment } from '@/server/features/comment'
 import { prisma } from '@/server/db'
+import { auth } from '@/auth'
+import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 
 // GET /api/comments/[id]
 export async function GET(
@@ -50,7 +52,24 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const session = await auth()
+
+    // Get comment info before delete for audit log
+    const comment = await prisma.comment.findUnique({
+      where: { id: params.id },
+      select: { content: true, nickname: true },
+    })
+
     await deleteComment(params.id)
+
+    // Create audit log
+    if (session?.user?.id && comment) {
+      await logAdminActionWithRequest(session.user.id, {
+        action: AuditAction.COMMENT_DELETE,
+        target: `评论: ${comment.nickname}`,
+        details: `删除评论: ${comment.content?.slice(0, 50)}...`,
+      }, request)
+    }
 
     return NextResponse.json({ success: true, message: '删除成功' })
   } catch (error) {

@@ -8,6 +8,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getPostById, updatePost, deletePost } from '@/server/features/post'
+import { auth } from '@/auth'
+import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 
 const updatePostSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -51,6 +53,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const session = await auth()
     const body = await request.json()
     const validated = updatePostSchema.safeParse(body)
 
@@ -62,6 +65,21 @@ export async function PATCH(
     }
 
     const post = await updatePost(params.id, validated.data)
+
+    // Create audit log
+    if (session?.user?.id) {
+      const action = validated.data.status === 'PUBLISHED'
+        ? AuditAction.POST_PUBLISH
+        : validated.data.status === 'ARCHIVED'
+        ? AuditAction.POST_ARCHIVE
+        : AuditAction.POST_UPDATE
+
+      await logAdminActionWithRequest(session.user.id, {
+        action,
+        target: post.title,
+        details: `更新文章: ${post.title}`,
+      }, request)
+    }
 
     return NextResponse.json({ success: true, data: post })
   } catch (error) {
@@ -79,7 +97,21 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const session = await auth()
+
+    // Get post info before delete for audit log
+    const post = await getPostById(params.id)
+
     await deletePost(params.id)
+
+    // Create audit log
+    if (session?.user?.id && post) {
+      await logAdminActionWithRequest(session.user.id, {
+        action: AuditAction.POST_DELETE,
+        target: post.title,
+        details: `删除文章: ${post.title}`,
+      }, request)
+    }
 
     return NextResponse.json({ success: true, message: '删除成功' })
   } catch (error) {

@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getPosts, createPost } from '@/server/features/post'
 import { auth } from '@/auth'
-import { logAdminAction, AuditAction } from '@/server/features/audit-log'
+import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,13 +77,11 @@ export async function POST(request: Request) {
 
     // Create audit log
     if (session?.user?.id) {
-      await logAdminAction(session.user.id, {
+      await logAdminActionWithRequest(session.user.id, {
         action: AuditAction.POST_CREATE,
         target: post.title,
         details: `创建文章: ${post.title}`,
-        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || undefined,
-        userAgent: request.headers.get('user-agent') || undefined,
-      })
+      }, request)
     }
 
     return NextResponse.json({ success: true, data: post }, { status: 201 })
