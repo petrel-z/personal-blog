@@ -4,24 +4,50 @@
 
 import { prisma } from '@/server/db'
 
-export async function getSettings(category?: string) {
-  const where: any = {}
-  if (category) {
-    where.category = category
+// Settings keys and their types
+export interface SiteSettings {
+  blogName: string
+  blogDescription: string
+  blogKeywords: string
+  ogImage: string
+  githubUrl: string
+  twitterUrl: string
+  autoApproveComments: boolean
+  requireEmailForComments: boolean
+}
+
+// Default settings
+const DEFAULT_SETTINGS: SiteSettings = {
+  blogName: '',
+  blogDescription: '',
+  blogKeywords: '',
+  ogImage: '',
+  githubUrl: '',
+  twitterUrl: '',
+  autoApproveComments: false,
+  requireEmailForComments: true,
+}
+
+// Parse string value to appropriate type
+function parseSettingValue(key: string, value: string): string | boolean {
+  // Boolean settings
+  if (key === 'autoApproveComments' || key === 'requireEmailForComments') {
+    return value === 'true' || value === '1'
   }
+  return value
+}
 
-  const settings = await prisma.settings.findMany({
-    where,
-    orderBy: { key: 'asc' },
-  })
+export async function getSettings(): Promise<SiteSettings> {
+  const settings = await prisma.settings.findMany()
 
-  // Convert to key-value object
-  const settingsMap: Record<string, string> = {}
+  const result = { ...DEFAULT_SETTINGS }
   for (const s of settings) {
-    settingsMap[s.key] = s.value
+    if (s.key in result) {
+      (result as any)[s.key] = parseSettingValue(s.key, s.value)
+    }
   }
 
-  return settingsMap
+  return result
 }
 
 export async function getSettingByKey(key: string) {

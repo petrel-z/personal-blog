@@ -9,35 +9,25 @@ import {
   getSettingByKey,
   updateSetting,
   updateSettings,
+  SiteSettings,
 } from '@/server/features/settings'
 
-const updateSettingSchema = z.object({
-  key: z.string().min(1),
-  value: z.string(),
-  category: z.string().optional(),
+// Schema for bulk settings update from frontend
+const updateSettingsSchema = z.object({
+  blogName: z.string().optional(),
+  blogDescription: z.string().optional(),
+  blogKeywords: z.string().optional(),
+  ogImage: z.string().optional(),
+  githubUrl: z.string().optional(),
+  twitterUrl: z.string().optional(),
+  autoApproveComments: z.boolean().optional(),
+  requireEmailForComments: z.boolean().optional(),
 })
 
-const updateSettingsSchema = z.record(z.string())
-
 // GET /api/settings
-// Query params: category (optional)
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category') || undefined
-    const key = searchParams.get('key')
-
-    // Get single setting by key
-    if (key) {
-      const value = await getSettingByKey(key)
-      return NextResponse.json({
-        success: true,
-        data: { key, value },
-      })
-    }
-
-    // Get all settings (optionally filtered by category)
-    const settings = await getSettings(category)
+    const settings = await getSettings()
 
     return NextResponse.json({
       success: true,
@@ -53,27 +43,12 @@ export async function GET(request: Request) {
 }
 
 // PUT /api/settings
-// Body: { key: string, value: string, category?: string } OR { settings: Record<string, string> }
+// Body: SiteSettings object
 export async function PUT(request: Request) {
   try {
     const body = await request.json()
+    const validated = updateSettingsSchema.safeParse(body)
 
-    // Bulk update
-    if (body.settings && typeof body.settings === 'object') {
-      const validated = updateSettingsSchema.safeParse(body.settings)
-      if (!validated.success) {
-        return NextResponse.json(
-          { success: false, error: validated.error.flatten() },
-          { status: 400 }
-        )
-      }
-
-      await updateSettings(validated.data)
-      return NextResponse.json({ success: true, message: '设置已更新' })
-    }
-
-    // Single update
-    const validated = updateSettingSchema.safeParse(body)
     if (!validated.success) {
       return NextResponse.json(
         { success: false, error: validated.error.flatten() },
@@ -81,15 +56,19 @@ export async function PUT(request: Request) {
       )
     }
 
-    const setting = await updateSetting(
-      validated.data.key,
-      validated.data.value,
-      validated.data.category
-    )
+    // Convert boolean values to strings for storage
+    const settingsToStore: Record<string, string> = {}
+    for (const [key, value] of Object.entries(validated.data)) {
+      if (value !== undefined) {
+        settingsToStore[key] = String(value)
+      }
+    }
 
-    return NextResponse.json({ success: true, data: setting })
+    await updateSettings(settingsToStore)
+
+    return NextResponse.json({ success: true, message: '设置已更新' })
   } catch (error) {
-    console.error('Failed to update setting:', error)
+    console.error('Failed to update settings:', error)
     return NextResponse.json(
       { success: false, error: '更新设置失败' },
       { status: 500 }
