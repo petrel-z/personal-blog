@@ -19,13 +19,23 @@ const createPostSchema = z.object({
 })
 
 // GET /api/posts
+// Query params: page, pageSize, status (optional - for admin), categoryId, tagSlug
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const page = Number(searchParams.get('page')) || 1
     const pageSize = Number(searchParams.get('pageSize')) || 10
+    const status = searchParams.get('status') as 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'all' | null
+    const categoryId = searchParams.get('categoryId') || undefined
+    const tagSlug = searchParams.get('tagSlug') || undefined
 
-    const result = await getPosts({ page, pageSize })
+    const result = await getPosts({
+      page,
+      pageSize,
+      status: status === 'all' ? undefined : status || undefined,
+      categoryId,
+      tagSlug,
+    })
 
     return NextResponse.json({
       success: true,

@@ -4,6 +4,7 @@
 
 import { prisma } from '@/server/db'
 import { CreateCommentInput } from './comment.types'
+import { CommentStatus } from '@prisma/client'
 
 export async function getComments(params: {
   postId?: string
@@ -13,8 +14,8 @@ export async function getComments(params: {
   const { postId, page = 1, pageSize = 10 } = params
 
   const where = postId
-    ? { postId, status: 'APPROVED', parentId: null }
-    : { status: 'APPROVED', parentId: null }
+    ? { postId, status: CommentStatus.APPROVED, parentId: null }
+    : { status: CommentStatus.APPROVED, parentId: null }
 
   const [comments, total] = await Promise.all([
     prisma.comment.findMany({

@@ -5,6 +5,9 @@
 import { api } from './fetch'
 import type { ApiResponse } from './fetch'
 
+// Re-export api for convenience
+export { api }
+
 // ==================== Types ====================
 
 export interface Post {

@@ -55,6 +55,8 @@ export const loginSchema = z.object({
   captcha: z.string().length(4, '验证码为4位'),
 })
 
+export type LoginInput = z.infer<typeof loginSchema>
+
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(50).default(10),

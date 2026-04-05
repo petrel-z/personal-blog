@@ -27,6 +27,7 @@ export interface UpdatePostInput {
 export interface PostListParams {
   page?: number
   pageSize?: number
+  status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'DELETED' | null
   categoryId?: string
   tagSlug?: string
 }

@@ -27,6 +27,16 @@ export async function createTag(data: { name: string; slug: string }) {
   })
 }
 
+export async function updateTag(
+  id: string,
+  data: { name?: string; slug?: string }
+) {
+  return prisma.tag.update({
+    where: { id },
+    data,
+  })
+}
+
 export async function deleteTag(id: string) {
   // 标签删除不检查文章关联（只解除关系）
   return prisma.tag.update({

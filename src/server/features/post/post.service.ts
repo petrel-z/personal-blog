@@ -3,20 +3,37 @@
  */
 
 import { prisma } from '@/server/db'
-import { CreatePostInput, UpdatePostInput } from './post.types'
+import { CreatePostInput, UpdatePostInput, PostListParams } from './post.types'
 
-export async function getPosts(params: {
-  page?: number
-  pageSize?: number
-}) {
-  const { page = 1, pageSize = 10 } = params
+export async function getPosts(params: PostListParams) {
+  const { page = 1, pageSize = 10, status, categoryId, tagSlug } = params
+
+  const where: any = {
+    deletedAt: null,
+  }
+
+  // Admin can filter by status, otherwise only show PUBLISHED
+  if (status) {
+    where.status = status
+  } else {
+    where.status = 'PUBLISHED'
+  }
+
+  if (categoryId) {
+    where.categoryId = categoryId
+  }
+
+  if (tagSlug) {
+    where.tags = {
+      some: {
+        slug: tagSlug,
+      },
+    }
+  }
 
   const [posts, total] = await Promise.all([
     prisma.post.findMany({
-      where: {
-        status: 'PUBLISHED',
-        deletedAt: null,
-      },
+      where,
       include: {
         category: true,
         tags: true,
@@ -31,12 +48,7 @@ export async function getPosts(params: {
         { publishedAt: 'desc' },
       ],
     }),
-    prisma.post.count({
-      where: {
-        status: 'PUBLISHED',
-        deletedAt: null,
-      },
-    }),
+    prisma.post.count({ where }),
   ])
 
   return {

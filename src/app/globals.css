@@ -3,45 +3,45 @@
 @tailwind utilities;
 
 :root {
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
+  --primary: #b58900;
+  --primary-foreground: #ffffff;
 
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  --background: #fdf6e3;
+  --foreground: #2e3338;
 
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card: #fdf6e3;
+  --card-foreground: #2e3338;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
+  --border: #dcd3b6;
+  --input: #dcd3b6;
+  --ring: #b58900;
 
   --radius: 0.5rem;
 
-  --sidebar: 210 40% 96.1%;
-  --sidebar-active: 210 40% 93%;
-  --text-main: 222.2 84% 4.9%;
-  --text-muted: 215 16% 47%;
+  --sidebar: #eee8d5;
+  --sidebar-active: #e0d7c1;
+  --text-main: #2e3338;
+  --text-muted: #5c5c5c;
 }
 
 .dark {
-  --primary: 217.2 91.2% 59.7%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  --primary: #dca300;
+  --primary-foreground: #1a1b1e;
 
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  --background: #1a1b1e;
+  --foreground: #c1c2c5;
 
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
+  --card: #1a1b1e;
+  --card-foreground: #c1c2c5;
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 224.3 76.3% 48%;
+  --border: #373a40;
+  --input: #373a40;
+  --ring: #dca300;
 
-  --sidebar: 217.2 32.6% 10%;
-  --sidebar-active: 217.2 32.6% 15%;
-  --text-main: 210 40% 98%;
-  --text-muted: 215 20.2% 65.1%;
+  --sidebar: #25262b;
+  --sidebar-active: #2c2e33;
+  --text-main: #c1c2c5;
+  --text-muted: #909296;
 }
 
 @layer base {
@@ -50,6 +50,73 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Markdown Styles */
+  .prose {
+    @apply max-w-none text-text-main;
+  }
+
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    @apply font-bold text-text-main;
+  }
+
+  .prose h1 {
+    @apply text-3xl mb-6 mt-8;
+  }
+  .prose h2 {
+    @apply text-2xl mb-4 mt-6;
+  }
+  .prose h3 {
+    @apply text-xl mb-3 mt-4;
+  }
+  .prose p {
+    @apply mb-4 leading-relaxed;
+  }
+  .prose ul {
+    @apply list-disc pl-6 mb-4;
+  }
+  .prose ol {
+    @apply list-decimal pl-6 mb-4;
+  }
+  .prose li {
+    @apply mb-1;
+  }
+  .prose code {
+    @apply bg-gray-100 dark:bg-gray-800 px-1 rounded text-sm font-mono;
+  }
+  .prose pre {
+    @apply bg-gray-900 text-gray-100 p-4 rounded-lg mb-4 overflow-x-auto;
+  }
+  .prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose img {
+    @apply rounded-lg max-w-full h-auto my-6;
+  }
+  .prose blockquote {
+    @apply border-l-4 border-primary pl-4 italic my-4 text-text-muted;
+  }
+  .prose a {
+    @apply text-primary hover:underline;
+  }
+  .prose strong {
+    @apply font-bold;
+  }
+  .prose table {
+    @apply w-full border-collapse mb-4;
+  }
+  .prose th,
+  .prose td {
+    @apply border border-border px-4 py-2 text-left;
+  }
+  .prose th {
+    @apply bg-sidebar font-bold;
   }
 }
 
@@ -65,6 +132,24 @@
     @apply bg-border rounded-full;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/30;
+    @apply bg-gray-400/50;
   }
+}
+
+/* Global scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
 }

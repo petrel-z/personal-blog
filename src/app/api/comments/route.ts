@@ -10,7 +10,7 @@ import { getComments, createComment } from '@/server/features/comment'
 const createCommentSchema = z.object({
   nickname: z.string().min(1).max(20),
   email: z.string().email().optional().or(z.literal('')),
-  website: z.string().url().optional().nullable(),
+  website: z.string().url().optional().or(z.literal('')),
   content: z.string().min(1).max(500),
   captcha: z.string().length(4),
   postId: z.string(),

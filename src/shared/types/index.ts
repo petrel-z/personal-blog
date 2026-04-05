@@ -9,10 +9,12 @@ export type {
   Comment,
   AuditLog,
   Settings,
-  SensitiveWord,
 } from '@prisma/client'
 
-export { PostStatus, CommentStatus } from '@prisma/client'
+import { PostStatus, CommentStatus } from '@prisma/client'
+
+// Re-export for convenience
+export { PostStatus, CommentStatus }
 
 // Session user type (extends NextAuth types)
 export interface SessionUser {

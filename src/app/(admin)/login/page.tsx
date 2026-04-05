@@ -1,63 +1,43 @@
+'use client'
+
+import React from 'react'
+import { LoginForm } from '../_components'
+
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md p-8 space-y-6 border rounded-lg bg-card">
+      <div className="w-full max-w-md p-8 space-y-6 border rounded-lg bg-card shadow-sm">
         <div className="text-center space-y-2">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-primary"
+              >
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+          </div>
           <h1 className="text-2xl font-bold">管理后台登录</h1>
           <p className="text-sm text-muted-foreground">
             请输入管理员账号信息
           </p>
         </div>
 
-        <form className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-              邮箱
-            </label>
-            <input
-              id="email"
-              type="email"
-              placeholder="admin@example.com"
-              className="w-full px-3 py-2 border rounded-lg bg-background"
-            />
-          </div>
+        <LoginForm />
 
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium">
-              密码
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              className="w-full px-3 py-2 border rounded-lg bg-background"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="captcha" className="text-sm font-medium">
-              验证码
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="captcha"
-                type="text"
-                placeholder="4位验证码"
-                className="flex-1 px-3 py-2 border rounded-lg bg-background"
-              />
-              <div className="px-4 py-2 bg-primary/10 text-primary font-mono font-bold rounded-lg cursor-pointer hover:bg-primary/20">
-                A7B9
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            登录
-          </button>
-        </form>
+        <p className="text-xs text-center text-muted-foreground">
+          登录即表示您同意我们的服务条款
+        </p>
       </div>
     </div>
   )

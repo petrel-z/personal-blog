@@ -3,7 +3,7 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 interface LogEntry {
   level: LogLevel
   message: string
-  timestamp: string
+  timestamp?: string
   context?: Record<string, unknown>
 }
 

@@ -19,6 +19,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
+      "@/auth": ["./auth"],
+      "@/auth.ts": ["./auth.ts"],
       "@/components/*": ["./src/components/*"],
       "@/server/*": ["./src/server/*"],
       "@/client/*": ["./src/client/*"],
