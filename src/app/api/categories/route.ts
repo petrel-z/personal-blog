@@ -4,12 +4,7 @@
 
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import {
-  getCategories,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-} from '@/server/features/category'
+import { getCategories, createCategory } from '@/server/features/category'
 
 const createCategorySchema = z.object({
   name: z.string().min(1).max(50),
@@ -51,56 +46,6 @@ export async function POST(request: Request) {
     console.error('Failed to create category:', error)
     return NextResponse.json(
       { success: false, error: '创建分类失败' },
-      { status: 500 }
-    )
-  }
-}
-
-// PATCH /api/categories/[id]
-export async function PATCH(request: Request) {
-  try {
-    const body = await request.json()
-    const { id, ...data } = body
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: '缺少分类 ID' },
-        { status: 400 }
-      )
-    }
-
-    const category = await updateCategory(id, data)
-
-    return NextResponse.json({ success: true, data: category })
-  } catch (error) {
-    console.error('Failed to update category:', error)
-    return NextResponse.json(
-      { success: false, error: '更新分类失败' },
-      { status: 500 }
-    )
-  }
-}
-
-// DELETE /api/categories/[id]
-export async function DELETE(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: '缺少分类 ID' },
-        { status: 400 }
-      )
-    }
-
-    await deleteCategory(id)
-
-    return NextResponse.json({ success: true, message: '删除成功' })
-  } catch (error) {
-    console.error('Failed to delete category:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : '删除分类失败' },
       { status: 500 }
     )
   }
