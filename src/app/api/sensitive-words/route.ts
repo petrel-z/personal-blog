@@ -6,6 +6,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSensitiveWords, createSensitiveWord } from '@/server/features/sensitive-word'
 
+export const dynamic = 'force-dynamic'
+
 const createSensitiveWordSchema = z.object({
   word: z.string().min(1).max(50),
   category: z.string().max(20).optional(),

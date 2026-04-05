@@ -6,6 +6,8 @@
 import { NextResponse } from 'next/server'
 import { getAdminComments } from '@/server/features/comment'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/comments/admin
 export async function GET(request: Request) {
   try {

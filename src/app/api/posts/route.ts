@@ -6,6 +6,10 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getPosts, createPost } from '@/server/features/post'
+import { auth } from '@/auth'
+import { logAdminAction, AuditAction } from '@/server/features/audit-log'
+
+export const dynamic = 'force-dynamic'
 
 const createPostSchema = z.object({
   title: z.string().min(1).max(200),
@@ -57,6 +61,7 @@ export async function GET(request: Request) {
 // POST /api/posts
 export async function POST(request: Request) {
   try {
+    const session = await auth()
     const body = await request.json()
     const validated = createPostSchema.safeParse(body)
 
@@ -67,9 +72,19 @@ export async function POST(request: Request) {
       )
     }
 
-    // TODO: 从 session 获取实际 authorId
-    const authorId = 'temp-author-id'
+    const authorId = session?.user?.id || 'anonymous'
     const post = await createPost(validated.data, authorId)
+
+    // Create audit log
+    if (session?.user?.id) {
+      await logAdminAction(session.user.id, {
+        action: AuditAction.POST_CREATE,
+        target: post.title,
+        details: `创建文章: ${post.title}`,
+        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || undefined,
+        userAgent: request.headers.get('user-agent') || undefined,
+      })
+    }
 
     return NextResponse.json({ success: true, data: post }, { status: 201 })
   } catch (error) {

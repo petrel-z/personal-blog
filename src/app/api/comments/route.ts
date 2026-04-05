@@ -7,12 +7,15 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getComments, createComment } from '@/server/features/comment'
 
+export const dynamic = 'force-dynamic'
+
 const createCommentSchema = z.object({
   nickname: z.string().min(1).max(20),
   email: z.string().email().optional().or(z.literal('')),
   website: z.string().url().optional().or(z.literal('')),
   content: z.string().min(1).max(500),
   captcha: z.string().length(4),
+  captchaId: z.string(),
   postId: z.string(),
   parentId: z.string().optional(),
 })
@@ -57,10 +60,51 @@ export async function POST(request: Request) {
       )
     }
 
-    const comment = await createComment(validated.data)
+    // Verify captcha
+    const captchaResponse = await fetch(new URL('/api/captcha', request.url), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        captchaId: validated.data.captchaId,
+        code: validated.data.captcha,
+      }),
+    })
+
+    const captchaResult = await captchaResponse.json()
+
+    if (!captchaResult.success) {
+      return NextResponse.json(
+        { success: false, error: '验证码错误或已过期' },
+        { status: 400 }
+      )
+    }
+
+    // Get IP and UserAgent for rate limiting
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+               request.headers.get('x-real-ip') ||
+               'unknown'
+    const userAgent = request.headers.get('user-agent') || undefined
+
+    const result = await createComment({
+      ...validated.data,
+      ip,
+      userAgent,
+    })
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.message },
+        { status: 429 }
+      )
+    }
 
     return NextResponse.json(
-      { success: true, message: '评论提交成功，等待审核', data: comment },
+      {
+        success: true,
+        message: result.message,
+        data: result.comment,
+        needsApproval: result.needsApproval,
+      },
       { status: 201 }
     )
   } catch (error) {

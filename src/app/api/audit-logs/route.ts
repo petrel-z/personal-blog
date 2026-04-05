@@ -6,6 +6,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getAuditLogs, createAuditLog } from '@/server/features/audit-log'
 
+export const dynamic = 'force-dynamic'
+
 const createAuditLogSchema = z.object({
   userId: z.string().optional(),
   action: z.string().min(1),
