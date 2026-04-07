@@ -5,9 +5,11 @@
  * DELETE /api/posts/[id]
  */
 
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getPostById, updatePost, deletePost } from '@/server/features/post'
+import { getPostById, updatePost, deletePost, getAdjacentPosts } from '@/server/features/post'
 import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 import { success, errors } from '@/lib/api-response'
@@ -35,7 +37,14 @@ export async function GET(
       return NextResponse.json(errors.notFound('文章不存在'))
     }
 
-    return NextResponse.json(success(post))
+    // Get adjacent posts (prev/next) within same category
+    const { prev, next } = await getAdjacentPosts(
+      post.categoryId,
+      post.id,
+      post.publishedAt
+    )
+
+    return NextResponse.json(success({ ...post, prev, next }))
   } catch (error) {
     console.error('Failed to fetch post:', error)
     return NextResponse.json(errors.serverError('获取文章失败'))

@@ -8,6 +8,7 @@ import { ApiCode } from '@/lib/api-response'
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>
+  signal?: AbortSignal
 }
 
 interface ApiError {
@@ -68,13 +69,14 @@ class FetchClient {
     }
 
     // 移除 options 中的 params，避免传递给 fetch
-    const { params, ...restOptions } = options || {}
+    const { params, signal, ...restOptions } = options || {}
 
     try {
       const response = await fetch(url, {
         method,
         headers,
         body: data ? JSON.stringify(data) : undefined,
+        signal,
         ...restOptions,
       })
 
@@ -102,6 +104,15 @@ class FetchClient {
 
       return result
     } catch (error) {
+      // Ignore abort errors
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return {
+          code: ApiCode.SERVER_ERROR,
+          message: '请求已取消',
+          data: null,
+          timestamp: Date.now(),
+        }
+      }
       if (error instanceof Error) {
         return {
           code: ApiCode.SERVER_ERROR,
@@ -124,9 +135,10 @@ class FetchClient {
    */
   async get<T>(
     endpoint: string,
-    params?: Record<string, string | number | boolean | undefined>
+    params?: Record<string, string | number | boolean | undefined>,
+    options?: { signal?: AbortSignal }
   ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
-    return this.request<T>('GET', endpoint, undefined, { params })
+    return this.request<T>('GET', endpoint, undefined, { params, ...options })
   }
 
   /**
@@ -134,9 +146,10 @@ class FetchClient {
    */
   async post<T>(
     endpoint: string,
-    data?: unknown
+    data?: unknown,
+    options?: { signal?: AbortSignal }
   ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
-    return this.request<T>('POST', endpoint, data)
+    return this.request<T>('POST', endpoint, data, options)
   }
 
   /**
@@ -144,9 +157,10 @@ class FetchClient {
    */
   async put<T>(
     endpoint: string,
-    data?: unknown
+    data?: unknown,
+    options?: { signal?: AbortSignal }
   ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
-    return this.request<T>('PUT', endpoint, data)
+    return this.request<T>('PUT', endpoint, data, options)
   }
 
   /**
@@ -154,9 +168,10 @@ class FetchClient {
    */
   async patch<T>(
     endpoint: string,
-    data?: unknown
+    data?: unknown,
+    options?: { signal?: AbortSignal }
   ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
-    return this.request<T>('PATCH', endpoint, data)
+    return this.request<T>('PATCH', endpoint, data, options)
   }
 
   /**
@@ -164,9 +179,10 @@ class FetchClient {
    */
   async delete<T>(
     endpoint: string,
-    data?: unknown
+    data?: unknown,
+    options?: { signal?: AbortSignal }
   ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
-    return this.request<T>('DELETE', endpoint, data)
+    return this.request<T>('DELETE', endpoint, data, options)
   }
 }
 

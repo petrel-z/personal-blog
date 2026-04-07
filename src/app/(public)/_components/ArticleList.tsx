@@ -111,6 +111,7 @@ export function ArticleList({
                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }`}
             aria-label="网格视图"
+            aria-pressed={viewMode === 'grid'}
           >
             <LayoutGrid size={16} />
           </button>
@@ -122,6 +123,7 @@ export function ArticleList({
                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }`}
             aria-label="列表视图"
+            aria-pressed={viewMode === 'list'}
           >
             <List size={16} />
           </button>

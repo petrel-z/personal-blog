@@ -3,6 +3,7 @@
  */
 
 import { prisma } from '@/server/db'
+import { Prisma } from '@prisma/client'
 import { CreateCommentInput } from './comment.types'
 import { CommentStatus } from '@prisma/client'
 import { checkSensitiveWords } from '../sensitive-word'
@@ -180,7 +181,7 @@ export async function getAdminComments(params: {
 }) {
   const { page = 1, pageSize = 10, status, postId } = params
 
-  const where: any = {}
+  const where: Prisma.CommentWhereInput = {}
   if (status) where.status = status
   if (postId) where.postId = postId
 

@@ -17,7 +17,11 @@ const createCategorySchema = z.object({
 export async function GET() {
   try {
     const categories = await getCategories()
-    return NextResponse.json(success(categories))
+    return NextResponse.json(success(categories), {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    })
   } catch (error) {
     console.error('Failed to fetch categories:', error)
     return NextResponse.json(errors.serverError('获取分类列表失败'))

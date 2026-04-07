@@ -21,7 +21,11 @@ const updateTagSchema = z.object({
 export async function GET() {
   try {
     const tags = await getTags()
-    return NextResponse.json(success(tags))
+    return NextResponse.json(success(tags), {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    })
   } catch (error) {
     console.error('Failed to fetch tags:', error)
     return NextResponse.json(errors.serverError('获取标签列表失败'))

@@ -40,6 +40,13 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 }
 
 // Feature types
+export interface AdjacentPost {
+  id: string
+  title: string
+  slug: string
+  publishedAt: Date | null
+}
+
 export interface PostWithRelations {
   id: string
   title: string
@@ -67,6 +74,8 @@ export interface PostWithRelations {
     id: string
     name?: string | null
   }
+  prev?: AdjacentPost | null
+  next?: AdjacentPost | null
 }
 
 export interface CommentWithReplies {

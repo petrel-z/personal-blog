@@ -2,6 +2,8 @@
  * Comment Types - 评论相关类型定义
  */
 
+import { Comment } from '@prisma/client'
+
 export interface CreateCommentInput {
   postId: string
   nickname: string
@@ -29,6 +31,6 @@ export interface CommentModerateParams {
 export interface CreateCommentResult {
   success: boolean
   message: string
-  comment?: any
+  comment?: Comment
   needsApproval?: boolean
 }

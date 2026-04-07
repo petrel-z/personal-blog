@@ -495,3 +495,80 @@ href={`/post/${article.id}`}
 8. **URL 设计**: 优先使用 ID 而非 slug 作为资源标识，更可靠且避免重复问题
 9. **接口返回格式**: 某些接口（如验证码）可能返回非常规格式，需要适配处理
 10. **成功反馈**: 操作成功后应提供明确的用户反馈，并适时跳转页面
+
+---
+
+## 22. 文章详情页 prev/next 逻辑错误
+
+**问题**：发布时间为 null 时排序错误，且 prev/next 方向颠倒
+
+**修复**：
+- fallback 使用 `createdAt` 替代 `publishedAt`
+- prev: `createdAt gt 当前值` + `ORDER BY createdAt ASC`
+- next: `createdAt lt 当前值` + `ORDER BY createdAt DESC`
+
+**文件**：`src/server/features/post/post.service.ts`
+
+---
+
+## 23. React useEffect 无限循环
+
+**问题**：`fetchArticle` 依赖 `article` 状态，又在函数内更新 `article`，形成循环
+
+**修复**：使用 `useRef` 判断首次加载，移除 `article` 依赖
+
+**文件**：`src/app/(public)/post/[id]/page.tsx`
+
+---
+
+## 24. 分类页语法错误
+
+**问题**：`fetchData` 箭头函数缺少闭合 `})`
+
+**文件**：`src/app/(public)/category/[slug]/page.tsx`
+
+---
+
+## 25. next/image 未配置 OSS 域名
+
+**错误**：`hostname "petrel-blog.oss-cn-beijing.aliyuncs.com" is not configured`
+
+**修复**：在 `next.config.js` 添加 OSS 域名配置
+
+---
+
+## 26. XSS 安全风险
+
+**问题**：`rehype-raw` 可能允许恶意 HTML
+
+**修复**：添加 `rehype-sanitize` 消毒插件
+
+---
+
+## 27. 登录验证码被禁用
+
+**修复**：重新启用 `LoginForm.tsx` 中的验证码验证逻辑
+
+---
+
+## 28. TypeScript any 类型滥用
+
+**修复**：使用 `Prisma.PostWhereInput` 等生成类型替代 any
+
+---
+
+## 29. 图片使用原生 img 标签
+
+**修复**：替换为 `next/image` 组件
+
+---
+
+## 30. formatDate 函数重复定义
+
+**修复**：统一到 `src/shared/utils/index.ts`
+
+---
+
+## 31. API 缺少缓存策略
+
+**修复**：stats/categories/tags API 添加 Cache-Control headers

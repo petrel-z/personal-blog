@@ -3,6 +3,7 @@
  */
 
 import { prisma } from '@/server/db'
+import { Prisma } from '@prisma/client'
 
 export async function getAuditLogs(params: {
   page?: number
@@ -14,7 +15,7 @@ export async function getAuditLogs(params: {
 }) {
   const { page = 1, pageSize = 20, userId, action, startDate, endDate } = params
 
-  const where: any = {}
+  const where: Prisma.AuditLogWhereInput = {}
   if (userId) where.userId = userId
   if (action) where.action = action
   if (startDate || endDate) {

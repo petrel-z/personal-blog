@@ -4,12 +4,13 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'motion/react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeSanitize from 'rehype-sanitize'
 import rehypeRaw from 'rehype-raw'
 import rehypeHighlight from 'rehype-highlight'
 import {
@@ -30,6 +31,8 @@ import { TableOfContents } from '../../_components/TableOfContents'
 import { CommentSection } from '../../_components/CommentSection'
 import { cn } from '@/lib/utils'
 import type { PostWithRelations } from '@/shared/types'
+import { PageError } from '@/components/shared/page-error'
+import { formatDate } from '@/shared/utils'
 
 export default function ArticleDetail() {
   const params = useParams()
@@ -42,37 +45,132 @@ export default function ArticleDetail() {
   const [isCopied, setIsCopied] = useState(false)
   const [isTOCVisible, setIsTOCVisible] = useState(true)
   const [isCategoryListVisible, setIsCategoryListVisible] = useState(true)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isPageLoading, setIsPageLoading] = useState(true) // 页面初始加载
+  const [isArticleLoading, setIsArticleLoading] = useState(false) // 文章切换加载
 
-  useEffect(() => {
-    fetchArticle()
-  }, [id])
+  // 左侧分类文章列表分页状态
+  const [categoryPage, setCategoryPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [sentinelRef, setSentinelRef] = useState<HTMLDivElement | null>(null)
+  const isFirstLoad = useRef(true)
 
-  const fetchArticle = async () => {
+  // 获取文章详情
+  const fetchArticle = useCallback(async (signal: AbortSignal) => {
     try {
-      setIsLoading(true)
-      const result = await api.get(`/posts/${id}`) as { code: number; data: PostWithRelations; message: string }
+      // 首次加载显示 loading，后续切换只显示顶部进度条
+      if (isFirstLoad.current) {
+        setIsPageLoading(true)
+      } else {
+        setIsArticleLoading(true)
+      }
+
+      const result = await api.get(`/posts/${id}`, undefined, { signal }) as { code: number; data: PostWithRelations; message: string }
       if (result.code === 2000 && result.data) {
         setArticle(result.data)
         setLikeCount(result.data.likeCount || 0)
+        isFirstLoad.current = false
 
-        // Fetch articles in the same category
+        // Fetch first page of articles in the same category
         if (result.data.category?.id) {
+          setCategoryPage(1)
           const postsResult = await api.get('/posts', {
             categoryId: result.data.category.id,
+            page: 1,
             pageSize: 10,
-          }) as { code: number; data: { items: PostWithRelations[] }; message: string }
+          }, { signal }) as { code: number; data: { items: PostWithRelations[]; total: number }; message: string }
           if (postsResult.code === 2000 && postsResult.data) {
             setCategoryArticles(postsResult.data.items || [])
+            setHasMore(postsResult.data.items?.length < postsResult.data.total)
           }
         }
       }
     } catch (error) {
+      // Ignore abort errors
+      if (error instanceof DOMException && error.name === 'AbortError') return
       console.error('Failed to fetch article:', error)
     } finally {
-      setIsLoading(false)
+      setIsPageLoading(false)
+      setIsArticleLoading(false)
     }
-  }
+  }, [id])
+
+  // 加载更多分类文章
+  const loadMoreCategoryArticles = useCallback(async (signal: AbortSignal) => {
+    if (!article?.category?.id || isLoadingMore || !hasMore) return
+
+    try {
+      setIsLoadingMore(true)
+      const nextPage = categoryPage + 1
+      const postsResult = await api.get('/posts', {
+        categoryId: article.category.id,
+        page: nextPage,
+        pageSize: 10,
+      }, { signal }) as { code: number; data: { items: PostWithRelations[]; total: number }; message: string }
+
+      if (postsResult.code === 2000 && postsResult.data) {
+        const newItems = postsResult.data.items || []
+        setCategoryArticles((prev) => {
+          const existingIds = new Set(prev.map((item) => item.id))
+          const uniqueNewItems = newItems.filter((item) => !existingIds.has(item.id))
+          const updatedItems = [...prev, ...uniqueNewItems]
+          setHasMore(updatedItems.length < postsResult.data.total)
+          return updatedItems
+        })
+        setCategoryPage(nextPage)
+      }
+    } catch (error) {
+      // Ignore abort errors
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      console.error('Failed to load more articles:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [article?.category?.id, categoryPage, isLoadingMore, hasMore])
+
+  // 获取文章 - id 变化时执行
+  useEffect(() => {
+    const abortController = new AbortController()
+
+    // 重置状态
+    isFirstLoad.current = true
+    setArticle(null)
+    setCategoryArticles([])
+    setLikeCount(0)
+    setIsPageLoading(true)
+
+    // 延迟一点执行，让状态先重置
+    const timer = setTimeout(() => {
+      fetchArticle(abortController.signal)
+    }, 0)
+
+    return () => {
+      clearTimeout(timer)
+      abortController.abort()
+    }
+  }, [id, fetchArticle])
+
+  // 滚动加载更多
+  useEffect(() => {
+    if (!sentinelRef || !isCategoryListVisible) return
+
+    const abortController = new AbortController()
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          loadMoreCategoryArticles(abortController.signal)
+        }
+      },
+      { rootMargin: '100px' }
+    )
+
+    observer.observe(sentinelRef)
+    return () => {
+      observer.disconnect()
+      abortController.abort()
+    }
+  }, [sentinelRef, hasMore, isLoadingMore, isCategoryListVisible, loadMoreCategoryArticles])
 
   const readingTime = article?.content ? Math.ceil(article.content.length / 300) : 0
 
@@ -89,7 +187,7 @@ export default function ArticleDetail() {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
-  if (isLoading) {
+  if (isPageLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <div className="text-text-muted">加载中...</div>
@@ -110,15 +208,16 @@ export default function ArticleDetail() {
     )
   }
 
-  const formatDate = (date: Date | string | null | undefined) => {
-    if (!date) return ''
-    const d = new Date(date)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
-
   return (
-    <div className="flex h-full w-full overflow-hidden relative">
-      {/* Left Column: Category Articles (Collapsible) */}
+    <PageError>
+      <div className="flex h-full w-full overflow-hidden relative">
+        {/* 切换文章时的顶部加载进度条 */}
+        {isArticleLoading && (
+          <div className="absolute top-0 left-0 right-0 z-50 h-0.5 bg-primary/20">
+            <div className="h-full bg-primary animate-pulse w-full" />
+          </div>
+        )}
+        {/* Left Column: Category Articles (Collapsible) */}
       <div
         className={cn(
           'hidden lg:flex flex-col border-r border-border bg-background transition-all duration-300 ease-in-out flex-shrink-0 relative',
@@ -143,7 +242,7 @@ export default function ArticleDetail() {
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               <div className="p-2">
-                {categoryArticles.filter((item) => item.id !== article.id).map((item) => {
+                {categoryArticles.map((item) => {
                   const isActive = item.id === id
                   return (
                     <Link
@@ -160,6 +259,23 @@ export default function ArticleDetail() {
                     </Link>
                   )
                 })}
+
+                {/* Sentinel for infinite scroll */}
+                <div ref={setSentinelRef} className="h-4" />
+
+                {/* Loading indicator */}
+                {isLoadingMore && (
+                  <div className="py-2 px-3 text-xs text-text-muted text-center">
+                    加载中...
+                  </div>
+                )}
+
+                {/* No more items */}
+                {!hasMore && categoryArticles.length > 0 && (
+                  <div className="py-2 px-3 text-xs text-text-muted text-center">
+                    没有更多文章了
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -220,7 +336,7 @@ export default function ArticleDetail() {
             <div className="prose dark:prose-invert">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                rehypePlugins={[rehypeSanitize, rehypeRaw, rehypeHighlight]}
               >
                 {article.content}
               </ReactMarkdown>
@@ -264,30 +380,55 @@ export default function ArticleDetail() {
 
             {/* Prev/Next Navigation */}
             <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Link
-                href="#"
-                className="p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all group"
-              >
-                <div className="flex items-center gap-2 text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
-                  <ChevronLeft size={12} />
-                  上一篇
+              {article.prev ? (
+                <Link
+                  href={`/post/${article.prev.id}`}
+                  className="p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all group"
+                >
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+                    <ChevronLeft size={12} />
+                    上一篇
+                  </div>
+                  <div className="text-sm font-bold text-text-main group-hover:text-primary transition-colors line-clamp-1">
+                    {article.prev.title}
+                  </div>
+                </Link>
+              ) : (
+                <div className="p-4 rounded-xl border border-border opacity-50">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+                    <ChevronLeft size={12} />
+                    上一篇
+                  </div>
+                  <div className="text-sm text-text-muted line-clamp-1">
+                    没有更早的文章了
+                  </div>
                 </div>
-                <div className="text-sm font-bold text-text-main group-hover:text-primary transition-colors line-clamp-1">
-                  没有了，已经是第一篇
+              )}
+
+              {article.next ? (
+                <Link
+                  href={`/post/${article.next.id}`}
+                  className="p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all group text-right"
+                >
+                  <div className="flex items-center justify-end gap-2 text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+                    下一篇
+                    <ChevronRight size={12} />
+                  </div>
+                  <div className="text-sm font-bold text-text-main group-hover:text-primary transition-colors line-clamp-1">
+                    {article.next.title}
+                  </div>
+                </Link>
+              ) : (
+                <div className="p-4 rounded-xl border border-border opacity-50 text-right">
+                  <div className="flex items-center justify-end gap-2 text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+                    下一篇
+                    <ChevronRight size={12} />
+                  </div>
+                  <div className="text-sm text-text-muted line-clamp-1">
+                    没有更新的文章了
+                  </div>
                 </div>
-              </Link>
-              <Link
-                href="#"
-                className="p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all group text-right"
-              >
-                <div className="flex items-center justify-end gap-2 text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
-                  下一篇
-                  <ChevronRight size={12} />
-                </div>
-                <div className="text-sm font-bold text-text-main group-hover:text-primary transition-colors line-clamp-1">
-                  ceph mon Operation not permitted 问题解决
-                </div>
-              </Link>
+              )}
             </div>
           </article>
 
@@ -358,6 +499,7 @@ export default function ArticleDetail() {
           </button>
         </div>
       )}
-    </div>
+      </div>
+    </PageError>
   )
 }

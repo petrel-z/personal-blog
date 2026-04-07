@@ -6,13 +6,15 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'motion/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '@/client/api'
 import type { PostWithRelations } from '@/shared/types'
 import { RightWidgets } from '../../_components/RightWidgets'
 import { cn } from '@/lib/utils'
+import { formatDate } from '@/shared/utils'
 
 interface CategoryInfo {
   id: string
@@ -32,11 +34,7 @@ export default function CategoryPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    fetchData()
-  }, [slug, currentPage])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -63,7 +61,11 @@ export default function CategoryPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [slug, currentPage])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // Show loading state
   if (isLoading) {
@@ -174,12 +176,6 @@ export default function CategoryPage() {
 }
 
 function ArticleCard({ article }: { article: PostWithRelations }) {
-  const formatDate = (date: Date | string | null | undefined) => {
-    if (!date) return ''
-    const d = new Date(date)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
-
   return (
     <article className="border-b border-border overflow-hidden hover:bg-sidebar-active/30 transition-colors group">
       <div className="flex flex-col md:flex-row gap-4 py-4">
@@ -189,10 +185,11 @@ function ArticleCard({ article }: { article: PostWithRelations }) {
             href={`/post/${article.id}`}
             className="w-full md:w-36 h-24 flex-shrink-0 rounded overflow-hidden relative group-hover:opacity-90 transition-opacity"
           >
-            <img
+            <Image
               src={article.coverImage}
               alt={article.title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
               referrerPolicy="no-referrer"
             />
             {(article as any).isPinned && (

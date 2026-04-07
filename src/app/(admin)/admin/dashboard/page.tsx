@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { api } from '@/client/api'
@@ -34,15 +34,7 @@ export default function DashboardPage() {
   const [recentComments, setRecentComments] = useState<RecentComment[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login?callbackUrl=/admin/dashboard')
-      return
-    }
-    fetchDashboardData()
-  }, [isAuthenticated, authLoading, router])
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -67,7 +59,17 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login?callbackUrl=/admin/dashboard')
+      return
+    }
+    if (isAuthenticated) {
+      fetchDashboardData()
+    }
+  }, [isAuthenticated, authLoading, router, fetchDashboardData])
 
   if (authLoading || isLoading) {
     return (

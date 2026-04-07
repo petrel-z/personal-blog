@@ -2,6 +2,8 @@
  * Post Types - 文章相关类型定义
  */
 
+import { Post } from '@prisma/client'
+
 export interface CreatePostInput {
   title: string
   content: string
@@ -33,7 +35,7 @@ export interface PostListParams {
 }
 
 export interface PostListResult {
-  posts: any[]
+  posts: Post[]
   total: number
   page: number
   pageSize: number

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Eye, MessageSquare, Calendar, Activity, Tag } from 'lucide-react'
 import { api } from '@/client/api'
 import type { PostWithRelations } from '@/shared/types'
@@ -86,12 +87,15 @@ export function RightWidgets() {
                     href={`/post/${article.id}`}
                     className="flex gap-2"
                   >
-                    <img
-                      src={article.coverImage || 'https://picsum.photos/seed/default/100/100'}
-                      alt={article.title}
-                      className="w-10 h-10 rounded object-cover flex-shrink-0"
-                      referrerPolicy="no-referrer"
-                    />
+                    <div className="relative w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                      <Image
+                        src={article.coverImage || 'https://picsum.photos/seed/default/100/100'}
+                        alt={article.title}
+                        fill
+                        className="object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                     <div className="space-y-1">
                       <h4 className="text-xs font-medium line-clamp-2 group-hover:text-primary transition-colors">
                         {article.title}

@@ -4,14 +4,16 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion } from 'motion/react'
 import { api } from '@/client/api'
 import type { PostWithRelations } from '@/shared/types'
 import { RightWidgets } from './_components/RightWidgets'
 import { cn } from '@/lib/utils'
+import { formatDate } from '@/shared/utils'
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState(1)
@@ -20,19 +22,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [featuredPost, setFeaturedPost] = useState<PostWithRelations | null>(null)
 
-  // Always use first article as featured if available
-  useEffect(() => {
-    fetchArticles()
-  }, [currentPage])
-
-  useEffect(() => {
-    if (articles.length > 0) {
-      const pinned = articles.find((p) => p.isPinned === true)
-      setFeaturedPost(pinned || articles[0])
-    }
-  }, [articles])
-
-  const fetchArticles = async () => {
+  const fetchArticles = useCallback(async () => {
     try {
       setIsLoading(true)
       const result = await api.get('/posts', { page: currentPage, pageSize: 10, status: 'PUBLISHED' }) as unknown as { code: number; data: { items: PostWithRelations[]; total: number; totalPages: number }; message: string }
@@ -46,13 +36,21 @@ export default function Home() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage])
 
-  const formatDate = (date: Date | string | null | undefined) => {
-    if (!date) return ''
-    const d = new Date(date)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
+  // Always use first article as featured if available
+  useEffect(() => {
+    const abortController = new AbortController()
+    fetchArticles()
+    return () => abortController.abort()
+  }, [fetchArticles])
+
+  useEffect(() => {
+    if (articles.length > 0) {
+      const pinned = articles.find((p) => p.isPinned === true)
+      setFeaturedPost(pinned || articles[0])
+    }
+  }, [articles])
 
   return (
     <motion.div
@@ -65,10 +63,11 @@ export default function Home() {
       <div className="flex-1 min-w-0 space-y-4">
         {/* Featured Banner - Always show, with placeholder when no article */}
         <div className="relative h-44 sm:h-56 overflow-hidden group border-b border-border">
-          <img
+          <Image
             src={featuredPost?.coverImage || 'https://picsum.photos/seed/banner/1200/600'}
             alt={featuredPost?.title || '博客封面'}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-700"
             referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-8">
@@ -192,10 +191,11 @@ function ArticleCard({ article }: { article: PostWithRelations }) {
             href={`/post/${article.id}`}
             className="w-full md:w-36 h-24 flex-shrink-0 rounded overflow-hidden relative group-hover:opacity-90 transition-opacity"
           >
-            <img
+            <Image
               src={article.coverImage}
               alt={article.title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
               referrerPolicy="no-referrer"
             />
             {(article as any).isPinned && (

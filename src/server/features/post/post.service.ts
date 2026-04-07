@@ -3,12 +3,13 @@
  */
 
 import { prisma } from '@/server/db'
+import { Prisma } from '@prisma/client'
 import { CreatePostInput, UpdatePostInput, PostListParams } from './post.types'
 
 export async function getPosts(params: PostListParams) {
   const { page = 1, pageSize = 10, status, categoryId, tagSlug } = params
 
-  const where: any = {
+  const where: Prisma.PostWhereInput = {
     deletedAt: null,
   }
 
@@ -167,4 +168,62 @@ export async function deletePost(id: string) {
       deletedAt: new Date(),
     },
   })
+}
+
+export async function getAdjacentPosts(categoryId: string | null, currentId: string, currentSortValue: Date | null) {
+  // Build category filter - need to use proper Prisma syntax for null matching
+  const categoryFilter = categoryId
+    ? { categoryId }
+    : { categoryId: { is: null } }
+
+  // Determine sort field and value: prefer publishedAt, fallback to createdAt
+  const sortField = currentSortValue ? 'publishedAt' : 'createdAt'
+
+  // Get current post's sort value if not provided
+  let sortValue = currentSortValue
+  if (!sortValue) {
+    const currentPost = await prisma.post.findUnique({
+      where: { id: currentId },
+      select: { createdAt: true, publishedAt: true },
+    })
+    sortValue = currentSortValue || currentPost?.createdAt || new Date()
+  }
+
+  // Get previous post (按列表顺序的前一篇文章)
+  const prevPost = await prisma.post.findFirst({
+    where: {
+      ...categoryFilter,
+      status: 'PUBLISHED',
+      deletedAt: null,
+      id: { not: currentId },
+      [sortField]: { gt: sortValue },
+    },
+    orderBy: { [sortField]: 'asc' },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      publishedAt: true,
+    },
+  })
+
+  // Get next post (按列表顺序的后一篇文章)
+  const nextPost = await prisma.post.findFirst({
+    where: {
+      ...categoryFilter,
+      status: 'PUBLISHED',
+      deletedAt: null,
+      id: { not: currentId },
+      [sortField]: { lt: sortValue },
+    },
+    orderBy: { [sortField]: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      publishedAt: true,
+    },
+  })
+
+  return { prev: prevPost, next: nextPost }
 }

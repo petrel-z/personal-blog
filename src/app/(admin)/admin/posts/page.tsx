@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
@@ -17,12 +17,7 @@ export default function PostsPage() {
   const [filter, setFilter] = useState<'all' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED'>('all')
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
-    fetchPosts()
-  }, [isAuthenticated, authLoading, page, filter])
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       setIsLoading(true)
       const params: Record<string, string | number> = { page, pageSize: 10 }
@@ -49,7 +44,12 @@ export default function PostsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page, filter, search])
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) return
+    fetchPosts()
+  }, [isAuthenticated, authLoading, fetchPosts])
 
   const handleDelete = async (id: string) => {
     if (!confirm('确定要删除这篇文章吗？')) return

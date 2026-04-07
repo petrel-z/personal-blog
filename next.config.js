@@ -10,6 +10,18 @@ const nextConfig = {
         protocol: 'https',
         hostname: '*.githubusercontent.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'petrel-blog.oss-cn-beijing.aliyuncs.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.oss-cn-beijing.aliyuncs.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.aliyuncs.com',
+      },
     ],
   },
   experimental: {

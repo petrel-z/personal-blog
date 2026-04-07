@@ -3,6 +3,7 @@
  */
 
 import { prisma } from '@/server/db'
+import { Prisma } from '@prisma/client'
 
 export async function getSensitiveWords(params: {
   page?: number
@@ -11,7 +12,7 @@ export async function getSensitiveWords(params: {
 }) {
   const { page = 1, pageSize = 20, category } = params
 
-  const where: any = {}
+  const where: Prisma.SensitiveWordWhereInput = {}
   if (category) {
     where.category = category
   }

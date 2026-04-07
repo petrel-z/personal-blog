@@ -40,10 +40,11 @@ function parseSettingValue(key: string, value: string): string | boolean {
 export async function getSettings(): Promise<SiteSettings> {
   const settings = await prisma.settings.findMany()
 
-  const result = { ...DEFAULT_SETTINGS }
+  const result: SiteSettings = { ...DEFAULT_SETTINGS }
   for (const s of settings) {
     if (s.key in result) {
-      (result as any)[s.key] = parseSettingValue(s.key, s.value)
+      const k = s.key as keyof SiteSettings
+      result[k] = parseSettingValue(s.key, s.value) as never
     }
   }
 
