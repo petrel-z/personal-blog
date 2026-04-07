@@ -30,19 +30,19 @@ export default function PostsPage() {
         params.status = filter
       }
 
-      const result = await api.get<{ posts: PostWithRelations[]; total: number }>('/posts', params)
+      const result = await api.get<{ posts: PostWithRelations[]; total: number; totalPages: number }>('/posts', params)
 
       if (result.success && result.data) {
         // Filter by search if needed (client-side for simplicity)
-        let filteredPosts = result.data.posts
+        let filteredPosts = result.data.posts || []
         if (search) {
           filteredPosts = filteredPosts.filter(p =>
             p.title.toLowerCase().includes(search.toLowerCase())
           )
         }
         setPosts(filteredPosts)
-        setTotal(result.total ?? 0)
-        setTotalPages(result.totalPages || 1)
+        setTotal(result.data.total ?? 0)
+        setTotalPages(result.data.totalPages || 1)
       }
     } catch {
       setError('获取文章列表失败')

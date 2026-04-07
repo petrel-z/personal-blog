@@ -16,13 +16,13 @@ export default function AdminLayout({
   return (
     <SessionProvider>
       <AuthProvider>
-        <div className="min-h-screen bg-background">
+        <div className="flex min-h-screen bg-background">
           <AdminSidebar
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
           />
 
-          <div className="lg:pl-64">
+          <div className="flex-1 ">
             <AdminHeader onMenuClick={() => setSidebarOpen(true)} />
 
             <main className="p-4 md:p-6 lg:p-8">

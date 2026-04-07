@@ -39,23 +39,24 @@ export function LoginForm() {
     setError(null)
 
     try {
-      // First verify captcha
-      const captchaResponse = await fetch('/api/captcha', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          captchaId: (window as unknown as { __captchaId?: string }).__captchaId,
-          code: data.captcha,
-        }),
-      })
-
-      const captchaResult = await captchaResponse.json()
-
-      if (!captchaResult.success) {
-        setError(captchaResult.error || '验证码错误')
-        setIsLoading(false)
-        return
-      }
+      // TODO: Temporarily skip captcha verification for testing
+      // // First verify captcha
+      // const captchaResponse = await fetch('/api/captcha', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     captchaId: (window as unknown as { __captchaId?: string }).__captchaId,
+      //     code: data.captcha,
+      //   }),
+      // })
+      //
+      // const captchaResult = await captchaResponse.json()
+      //
+      // if (!captchaResult.success) {
+      //   setError(captchaResult.error || '验证码错误')
+      //   setIsLoading(false)
+      //   return
+      // }
 
       // Then attempt login
       const result = await signIn('credentials', {

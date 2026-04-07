@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
 import type { PostWithRelations } from '@/shared/types'
@@ -26,6 +27,7 @@ interface RecentComment {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const [stats, setStats] = useState<OverviewStats | null>(null)
   const [popularPosts, setPopularPosts] = useState<PostWithRelations[]>([])
@@ -33,9 +35,12 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login?callbackUrl=/admin/dashboard')
+      return
+    }
     fetchDashboardData()
-  }, [isAuthenticated, authLoading])
+  }, [isAuthenticated, authLoading, router])
 
   const fetchDashboardData = async () => {
     try {

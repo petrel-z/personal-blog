@@ -141,7 +141,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       {/* Sidebar */}
       <aside
         className={clsx(
-          'fixed left-0 top-0 z-50 h-full w-64 bg-sidebar border-r transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto',
+          'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-border flex-shrink-0 transition-transform duration-300 lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
