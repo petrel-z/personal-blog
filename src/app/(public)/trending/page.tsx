@@ -45,7 +45,7 @@ export default function TrendingPage() {
           {posts.map((post, index) => (
             <Link
               key={post.id}
-              href={`/post/${post.slug}`}
+              href={`/post/${post.id}`}
               className="flex items-center gap-4 p-4 border rounded-lg hover:border-primary/50 hover:bg-sidebar-active/30 transition-all group"
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${

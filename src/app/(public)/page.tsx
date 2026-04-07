@@ -81,7 +81,7 @@ export default function Home() {
                 <span>{featuredPost ? formatDate(featuredPost.publishedAt) : ''}</span>
               </div>
               {featuredPost ? (
-                <Link href={`/post/${featuredPost.slug}`}>
+                <Link href={`/post/${featuredPost.id}`}>
                   <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight group-hover:text-primary transition-colors">
                     {featuredPost.title}
                   </h1>
@@ -189,7 +189,7 @@ function ArticleCard({ article }: { article: PostWithRelations }) {
         {/* Cover Image */}
         {article.coverImage && (
           <Link
-            href={`/post/${article.slug}`}
+            href={`/post/${article.id}`}
             className="w-full md:w-36 h-24 flex-shrink-0 rounded overflow-hidden relative group-hover:opacity-90 transition-opacity"
           >
             <img
@@ -225,7 +225,7 @@ function ArticleCard({ article }: { article: PostWithRelations }) {
               </div>
             </div>
 
-            <Link href={`/post/${article.slug}`}>
+            <Link href={`/post/${article.id}`}>
               <h2 className="text-lg font-bold text-text-main group-hover:text-primary transition-colors leading-tight">
                 {article.title}
               </h2>

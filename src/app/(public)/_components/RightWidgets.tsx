@@ -83,7 +83,7 @@ export function RightWidgets() {
                   className="p-2 hover:bg-sidebar-active/30 transition-colors group"
                 >
                   <Link
-                    href={`/post/${article.slug}`}
+                    href={`/post/${article.id}`}
                     className="flex gap-2"
                   >
                     <img

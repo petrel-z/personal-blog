@@ -214,7 +214,7 @@ function SearchResultCard({
         {/* Cover Image */}
         {article.coverImage && (
           <Link
-            href={`/post/${article.slug}`}
+            href={`/post/${article.id}`}
             className="w-24 h-16 flex-shrink-0 rounded overflow-hidden"
           >
             <img
@@ -237,7 +237,7 @@ function SearchResultCard({
             </span>
           </div>
 
-          <Link href={`/post/${article.slug}`}>
+          <Link href={`/post/${article.id}`}>
             <h3 className="text-sm font-bold text-text-main hover:text-primary transition-colors line-clamp-1">
               {highlightText(article.title)}
             </h3>

@@ -8,8 +8,8 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: {
-    default: 'Frytea Blog',
-    template: '%s | Frytea Blog',
+    default: 'Petrel Blog',
+    template: '%s | Petrel Blog',
   },
   description: 'A personal tech blog',
 }

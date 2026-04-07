@@ -2,11 +2,18 @@
  * About - 关于我页面
  */
 
-'use client'
+"use client";
 
-import { motion } from 'motion/react'
-import ReactMarkdown from 'react-markdown'
-import { Github, Twitter, Mail, MapPin, Briefcase, GraduationCap } from 'lucide-react'
+import { motion } from "motion/react";
+import ReactMarkdown from "react-markdown";
+import {
+  Github,
+  Twitter,
+  Mail,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+} from "lucide-react";
 
 const aboutContent = `
 # 关于我
@@ -31,9 +38,9 @@ const aboutContent = `
 如果你有任何问题或想进行技术交流，欢迎通过以下方式联系我：
 
 - **Email**: [zhaohaiyan1123@gmail.com](mailto:zhaohaiyan1123@gmail.com)
-- **GitHub**: [frytea](https://github.com/frytea)
-- **Twitter**: [@frytea](https://twitter.com/frytea)
-`
+- **GitHub**: [Petrel](https://github.com/Petrel)
+- **Twitter**: [@Petrel](https://twitter.com/Petrel)
+`;
 
 export default function About() {
   return (
@@ -105,5 +112,5 @@ export default function About() {
         </div>
       </div>
     </motion.div>
-  )
+  );
 }

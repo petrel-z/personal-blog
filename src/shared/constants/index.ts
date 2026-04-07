@@ -1,4 +1,4 @@
-export const APP_NAME = 'Frytea Blog'
+export const APP_NAME = 'Petrel Blog'
 export const APP_DESCRIPTION = 'A personal tech blog'
 
 // Pagination

@@ -292,3 +292,206 @@ OSS_CDN_DOMAIN="https://your-cdn-domain.com"  # 可选
 3. **类型定义**: 定期检查 shared/types 是否与数据库模型同步
 4. **云存储配置**: 需要同时配置 Bucket ACL 和 RAM 权限
 5. **错误日志**: 使用 `console.error` 输出完整错误信息便于排查
+
+---
+
+## 14. 文章详情页 URL 从 slug 改为 id
+
+### 问题描述
+文章详情页使用 slug 作为 URL，但 slug 可能不唯一，且数据库虽然有唯一索引，但万一重复会导致问题。
+
+### 解决方案
+使用文章 ID 作为 URL，更可靠：
+- 移动页面路由：`/post/[slug]` → `/post/[id]`
+- API 调用：`/api/posts/slug/${slug}` → `/api/posts/${id}`
+- 所有文章链接：`/post/${article.slug}` → `/post/${article.id}`
+
+### 受影响文件
+- `src/app/(public)/post/[slug]/page.tsx` → `src/app/(public)/post/[id]/page.tsx`
+- `src/app/(public)/page.tsx`
+- `src/app/(public)/_components/ArticleCard.tsx`
+- `src/app/(public)/_components/FeaturedBanner.tsx`
+- `src/app/(public)/_components/RightWidgets.tsx`
+- `src/app/(public)/category/[slug]/page.tsx`
+- `src/app/(public)/search/page.tsx`
+- `src/app/(public)/trending/page.tsx`
+
+---
+
+## 15. 登录页被后台布局包裹
+
+### 问题描述
+登录页位于 `(admin)` 路由组下，被 `layout.tsx` 的 AdminSidebar 和 AdminHeader 包裹，导致显示异常。
+
+### 解决方案
+将登录页移到 `(admin)` 路由组外面，成为独立的路由：
+- 移动：`src/app/(admin)/login/page.tsx` → `src/app/login/page.tsx`
+- 登录页使用独立的全屏布局，不再使用后台侧边栏和头部
+
+### 受影响文件
+- `src/app/login/page.tsx`（新建）
+- 修复 `LoginForm` 组件的导入路径
+
+---
+
+## 16. 登录页 useSearchParams 需要 Suspense
+
+### 问题描述
+构建时报错：`useSearchParams() should be wrapped in a suspense boundary at page "/login"`
+
+### 解决方案
+在 `LoginPage` 中用 `Suspense` 包裹 `LoginForm` 组件：
+```tsx
+import { Suspense } from 'react'
+import { Loader2 } from 'lucide-react'
+
+<Suspense fallback={
+  <div className="flex items-center justify-center py-4">
+    <Loader2 className="animate-spin text-muted-foreground" />
+  </div>
+}>
+  <LoginForm />
+</Suspense>
+```
+
+### 受影响文件
+- `src/app/login/page.tsx`
+
+---
+
+## 17. 文章更新接口 HTTP 方法错误
+
+### 问题描述
+更新文章时报错：`Unexpected end of JSON input`，原因是前端用 `api.put()` 但后端只支持 `PATCH` 方法。
+
+### 解决方案
+将 `api.put()` 改为 `api.patch()`：
+```typescript
+// 错误
+result = await api.put(`/posts/${id}`, data)
+
+// 正确
+result = await api.patch(`/posts/${id}`, data)
+```
+
+### 受影响文件
+- `src/app/(admin)/admin/posts/[id]/page.tsx`
+
+---
+
+## 18. 文章更新成功后无提示且不跳转
+
+### 问题描述
+更新文章成功后没有明显的成功提示，也不返回文章列表页。
+
+### 解决方案
+1. 显示成功状态："已保存"
+2. 1.5秒后自动跳转到文章列表页：
+```typescript
+if (result.code === 2000 || result.code === 2010) {
+  setSaveStatus('saved')
+  if (id === 'new' && result.data) {
+    router.push(`/admin/posts/${(result.data as PostWithRelations).id}`)
+  } else {
+    setTimeout(() => {
+      router.push('/admin/posts')
+    }, 1500)
+  }
+}
+```
+
+### 受影响文件
+- `src/app/(admin)/admin/posts/[id]/page.tsx`
+
+---
+
+## 19. 评论组件对接真实接口
+
+### 问题描述
+评论区组件使用硬编码的 mock 数据，没有对接真实 API。
+
+### 解决方案
+1. 评论组件接收 `postId` 参数
+2. 从 `/api/comments?postId=xxx` 获取已审核评论
+3. 提交评论到 `/api/comments`
+4. 显示提交状态（成功/失败）
+
+### 验证码接口适配
+验证码接口返回格式特殊：ID 在响应头 `X-Captcha-Id` 中，图片是 SVG 直接返回：
+```typescript
+const fetchCaptcha = async () => {
+  const response = await fetch('/api/captcha')
+  const captchaId = response.headers.get('X-Captcha-Id') || ''
+  const svg = await response.text()
+  setCaptchaId(captchaId)
+  setCaptchaImage(`data:image/svg+xml;base64,${btoa(svg)}`)
+}
+```
+
+### 受影响文件
+- `src/app/(public)/_components/CommentSection.tsx`
+- `src/app/(public)/post/[id]/page.tsx`
+
+---
+
+## 20. 侧边栏热门文章缺少 coverImage 字段
+
+### 问题描述
+侧边栏热门文章接口返回的数据没有 `coverImage`，导致图片显示为空。
+
+### 解决方案
+在 `getTrendingPosts` 查询中添加 `coverImage` 字段：
+```typescript
+const posts = await prisma.post.findMany({
+  where: { ... },
+  select: {
+    id: true,
+    title: true,
+    slug: true,
+    viewCount: true,
+    likeCount: true,
+    commentCount: true,
+    publishedAt: true,
+    coverImage: true,  // 添加此字段
+  },
+})
+```
+
+### 受影响文件
+- `src/server/features/stats/stats.service.ts`
+
+---
+
+## 21. 前端文章链接未同步更新
+
+### 问题描述
+文章详情页 URL 从 slug 改为 id 后，前端其他位置的文章链接仍在使用 slug。
+
+### 解决方案
+将所有文章链接从 `article.slug` 改为 `article.id`：
+```typescript
+// 修改前
+href={`/post/${article.slug}`}
+
+// 修改后
+href={`/post/${article.id}`}
+```
+
+### 受影响文件
+- `src/app/(public)/page.tsx`
+- `src/app/(public)/_components/ArticleCard.tsx`
+- `src/app/(public)/_components/FeaturedBanner.tsx`
+- `src/app/(public)/_components/RightWidgets.tsx`
+- `src/app/(public)/category/[slug]/page.tsx`
+- `src/app/(public)/search/page.tsx`
+- `src/app/(public)/trending/page.tsx`
+
+---
+
+## 经验总结（续）
+
+6. **HTTP 方法匹配**: 调用 API 时确保前端使用的 HTTP 方法（GET/POST/PATCH/DELETE）与后端一致
+7. **Suspense 边界**: 使用 `useSearchParams`、`useRouter` 等客户端 hooks 时，需要用 Suspense 包裹
+8. **URL 设计**: 优先使用 ID 而非 slug 作为资源标识，更可靠且避免重复问题
+9. **接口返回格式**: 某些接口（如验证码）可能返回非常规格式，需要适配处理
+10. **成功反馈**: 操作成功后应提供明确的用户反馈，并适时跳转页面

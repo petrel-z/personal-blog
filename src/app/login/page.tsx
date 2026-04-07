@@ -1,7 +1,8 @@
 'use client'
 
-import React from 'react'
-import { LoginForm } from '../_components'
+import React, { Suspense } from 'react'
+import { LoginForm } from '../(admin)/_components'
+import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   return (
@@ -33,7 +34,13 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <LoginForm />
+        <Suspense fallback={
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="animate-spin text-muted-foreground" />
+          </div>
+        }>
+          <LoginForm />
+        </Suspense>
 
         <p className="text-xs text-center text-muted-foreground">
           登录即表示您同意我们的服务条款

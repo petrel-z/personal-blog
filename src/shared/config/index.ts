@@ -1,17 +1,17 @@
 export const siteConfig = {
-  name: 'Frytea Blog',
+  name: 'Petrel Blog',
   description: 'A personal tech blog',
   url: process.env.NEXTAUTH_URL || 'http://localhost:3000',
   author: 'tl.s',
   social: {
-    github: 'https://github.com/frytea',
-    twitter: 'https://twitter.com/frytea',
+    github: 'https://github.com/Petrel',
+    twitter: 'https://twitter.com/Petrel',
   },
 }
 
 export const seoConfig = {
-  titleTemplate: '%s | Frytea Blog',
-  defaultTitle: 'Frytea Blog',
+  titleTemplate: '%s | Petrel Blog',
+  defaultTitle: 'Petrel Blog',
   defaultDescription: 'A personal tech blog',
   ogImage: '/og-image.png',
 }

@@ -73,7 +73,7 @@ export function ArticleCard({ post }: ArticleCardProps) {
         {/* Cover Image - Left side */}
         {post.coverImage && (
           <Link
-            href={`/post/${post.slug}`}
+            href={`/post/${post.id}`}
             className="w-full md:w-36 h-24 flex-shrink-0 rounded overflow-hidden relative group-hover:opacity-90 transition-opacity"
           >
             <img
@@ -111,7 +111,7 @@ export function ArticleCard({ post }: ArticleCardProps) {
               </div>
             </div>
 
-            <Link href={`/post/${post.slug}`}>
+            <Link href={`/post/${post.id}`}>
               <h2 className="text-lg font-bold leading-tight group-hover:text-primary transition-colors">
                 {post.title}
               </h2>

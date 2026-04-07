@@ -33,7 +33,7 @@ export function FeaturedBanner({ post }: FeaturedBannerProps) {
             )}
             <span>置顶</span>
           </div>
-          <Link href={`/post/${post.slug}`}>
+          <Link href={`/post/${post.id}`}>
             <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight group-hover:text-primary transition-colors">
               {post.title}
             </h1>

@@ -48,6 +48,7 @@ export async function getTrendingPosts(timeframe: 'all' | 'month' | 'week' = 'al
       likeCount: true,
       commentCount: true,
       publishedAt: true,
+      coverImage: true,
     },
   })
 

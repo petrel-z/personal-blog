@@ -101,7 +101,7 @@ export default function PostEditPage() {
 
       let result
       if (id && id !== 'new') {
-        result = await api.put(`/posts/${id}`, data)
+        result = await api.patch(`/posts/${id}`, data)
       } else {
         result = await api.post('/posts', data)
       }
@@ -111,8 +111,12 @@ export default function PostEditPage() {
         if (id === 'new' && result.data) {
           // Redirect to edit page with new ID
           router.push(`/admin/posts/${(result.data as PostWithRelations).id}`)
+        } else {
+          // After saving existing post, redirect to posts list after showing success
+          setTimeout(() => {
+            router.push('/admin/posts')
+          }, 1500)
         }
-        setTimeout(() => setSaveStatus('idle'), 2000)
       } else {
         setSaveStatus('error')
         setError(result.message || '保存失败')

@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'motion/react'
@@ -25,25 +25,56 @@ import {
   Check,
   List,
 } from 'lucide-react'
-import { articles } from '../../_components/mock/data'
+import { api } from '@/client/api'
 import { TableOfContents } from '../../_components/TableOfContents'
 import { CommentSection } from '../../_components/CommentSection'
 import { cn } from '@/lib/utils'
+import type { PostWithRelations } from '@/shared/types'
 
 export default function ArticleDetail() {
   const params = useParams()
-  const slug = params.slug as string
-  const article = articles.find((a) => a.slug === slug) || articles[0]
+  const id = params.id as string
 
+  const [article, setArticle] = useState<PostWithRelations | null>(null)
+  const [categoryArticles, setCategoryArticles] = useState<PostWithRelations[]>([])
   const [isLiked, setIsLiked] = useState(false)
-  const [likeCount, setLikeCount] = useState(article.likeCount)
+  const [likeCount, setLikeCount] = useState(0)
   const [isCopied, setIsCopied] = useState(false)
   const [isTOCVisible, setIsTOCVisible] = useState(true)
   const [isCategoryListVisible, setIsCategoryListVisible] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Get articles in the same category
-  const categoryArticles = articles.filter((a) => a.category === article.category)
-  const readingTime = Math.ceil(article.content.length / 300)
+  useEffect(() => {
+    fetchArticle()
+  }, [id])
+
+  const fetchArticle = async () => {
+    try {
+      setIsLoading(true)
+      const result = await api.get(`/posts/${id}`) as { code: number; data: PostWithRelations; message: string }
+      if (result.code === 2000 && result.data) {
+        setArticle(result.data)
+        setLikeCount(result.data.likeCount || 0)
+
+        // Fetch articles in the same category
+        if (result.data.category?.id) {
+          const postsResult = await api.get('/posts', {
+            categoryId: result.data.category.id,
+            pageSize: 10,
+          }) as { code: number; data: { items: PostWithRelations[] }; message: string }
+          if (postsResult.code === 2000 && postsResult.data) {
+            setCategoryArticles(postsResult.data.items || [])
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch article:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const readingTime = article?.content ? Math.ceil(article.content.length / 300) : 0
 
   const handleLike = () => {
     if (!isLiked) {
@@ -56,6 +87,33 @@ export default function ArticleDetail() {
     navigator.clipboard.writeText(window.location.href)
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="text-text-muted">加载中...</div>
+      </div>
+    )
+  }
+
+  if (!article) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-text-main mb-4">文章不存在</h1>
+          <Link href="/" className="text-primary hover:underline">
+            返回首页
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const formatDate = (date: Date | string | null | undefined) => {
+    if (!date) return ''
+    const d = new Date(date)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
   return (
@@ -72,7 +130,7 @@ export default function ArticleDetail() {
             <div className="p-4 h-14 border-b border-border flex items-center justify-between flex-shrink-0">
               <h3 className="text-xs font-bold text-text-muted flex items-center gap-2 truncate">
                 <List size={14} />
-                {article.category}
+                {article.category?.name || '未分类'}
               </h3>
               <button
                 onClick={() => setIsCategoryListVisible(false)}
@@ -85,12 +143,12 @@ export default function ArticleDetail() {
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               <div className="p-2">
-                {categoryArticles.map((item) => {
-                  const isActive = item.slug === slug
+                {categoryArticles.filter((item) => item.id !== article.id).map((item) => {
+                  const isActive = item.id === id
                   return (
                     <Link
                       key={item.id}
-                      href={`/post/${item.slug}`}
+                      href={`/post/${item.id}`}
                       className={cn(
                         'block py-2 px-3 rounded text-xs transition-colors line-clamp-2',
                         isActive
@@ -128,9 +186,9 @@ export default function ArticleDetail() {
             <header className="space-y-4 mb-8 pb-8 border-b border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-medium text-text-muted">
-                  <span>{article.category}</span>
+                  <span>{article.category?.name || '未分类'}</span>
                   <span>/</span>
-                  <span className="text-primary">{article.tags[0]}</span>
+                  <span className="text-primary">{article.tags?.[0]?.name || ''}</span>
                 </div>
               </div>
 
@@ -141,15 +199,15 @@ export default function ArticleDetail() {
               <div className="flex flex-wrap items-center gap-4 text-[10px] text-text-muted uppercase tracking-wider font-bold">
                 <div className="flex items-center gap-1.5">
                   <User size={12} />
-                  <span>tl.s</span>
+                  <span>{article.author?.name || '匿名'}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar size={12} />
-                  <span>{article.publishDate}</span>
+                  <span>{formatDate(article.publishedAt)}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Eye size={12} />
-                  <span>{article.viewCount}</span>
+                  <span>{article.viewCount || 0}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock size={12} />
@@ -234,7 +292,7 @@ export default function ArticleDetail() {
           </article>
 
           {/* Comments */}
-          <CommentSection />
+          <CommentSection postId={article.id} />
 
           {/* Footer inside scrollable area */}
           <footer className="mt-20 py-6 border-t border-border">

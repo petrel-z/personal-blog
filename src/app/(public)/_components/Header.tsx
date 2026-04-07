@@ -2,18 +2,29 @@
  * Header - 顶部导航组件
  */
 
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { Search, Moon, Sun, User, Cloud, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import Link from "next/link";
+import {
+  Search,
+  Moon,
+  Sun,
+  User,
+  Cloud,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface HeaderProps {
-  isSidebarVisible?: boolean
-  onToggleSidebar?: () => void
+  isSidebarVisible?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export function Header({ isSidebarVisible = true, onToggleSidebar }: HeaderProps) {
+export function Header({
+  isSidebarVisible = true,
+  onToggleSidebar,
+}: HeaderProps) {
   return (
     <header className="w-full bg-background border-b border-border">
       <div className="px-6 h-14 flex items-center justify-between gap-4">
@@ -23,7 +34,7 @@ export function Header({ isSidebarVisible = true, onToggleSidebar }: HeaderProps
             <button
               onClick={onToggleSidebar}
               className="p-2 rounded hover:bg-sidebar-active/50 text-text-muted hover:text-primary transition-colors"
-              title={isSidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
+              title={isSidebarVisible ? "隐藏侧边栏" : "显示侧边栏"}
             >
               {isSidebarVisible ? (
                 <PanelLeftClose size={20} />
@@ -35,7 +46,7 @@ export function Header({ isSidebarVisible = true, onToggleSidebar }: HeaderProps
           <Link href="/" className="flex items-center gap-2">
             <Cloud className="text-primary" size={20} />
             <h1 className="text-sm font-bold text-text-main hidden sm:block">
-              Frytea's Blog
+              Petrel's Blog
             </h1>
           </Link>
         </div>
@@ -69,5 +80,5 @@ export function Header({ isSidebarVisible = true, onToggleSidebar }: HeaderProps
         </div>
       </div>
     </header>
-  )
+  );
 }

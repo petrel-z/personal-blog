@@ -4,50 +4,104 @@
 
 'use client'
 
-import { useState } from 'react'
-import { User, MessageSquare, Send, RefreshCw, Reply } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { User, MessageSquare, Send, Reply, Loader2 } from 'lucide-react'
+import { api } from '@/client/api'
+import { cn } from '@/lib/utils'
 
 interface Comment {
   id: string
   nickname: string
   content: string
-  date: string
-  replies?: Comment[]
+  createdAt: string
+  children?: Comment[]
 }
 
-const mockComments: Comment[] = [
-  {
-    id: '1',
-    nickname: '张三',
-    content: '这篇文章写得非常有深度，特别是关于 ceph 权限那块，解决了我的燃眉之急！',
-    date: '2026-04-03 14:20',
-    replies: [
-      {
-        id: '2',
-        nickname: '博主',
-        content: '很高兴能帮到你！',
-        date: '2026-04-03 15:00',
-      },
-    ],
-  },
-  {
-    id: '3',
-    nickname: '李四',
-    content: '期待下一篇关于 Kubernetes 调度的文章。',
-    date: '2026-04-02 09:15',
-  },
-]
+interface CommentSectionProps {
+  postId: string
+}
 
-export function CommentSection() {
-  const [captcha, setCaptcha] = useState('A7B9')
+export function CommentSection({ postId }: CommentSectionProps) {
+  const [comments, setComments] = useState<Comment[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [nickname, setNickname] = useState('')
+  const [content, setContent] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [captcha, setCaptcha] = useState('')
+  const [captchaId, setCaptchaId] = useState('')
+  const [captchaImage, setCaptchaImage] = useState('')
 
-  const refreshCaptcha = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    let result = ''
-    for (let i = 0; i < 4; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length))
+  useEffect(() => {
+    fetchComments()
+    fetchCaptcha()
+  }, [postId])
+
+  const fetchComments = async () => {
+    try {
+      setIsLoading(true)
+      const result = await api.get('/comments', { postId, pageSize: 50 }) as {
+        code: number
+        data: { items: Comment[] }
+        message: string
+      }
+      if (result.code === 2000 && result.data) {
+        setComments(result.data.items || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch comments:', error)
+    } finally {
+      setIsLoading(false)
     }
-    setCaptcha(result)
+  }
+
+  const fetchCaptcha = async () => {
+    try {
+      const response = await fetch('/api/captcha')
+      const captchaId = response.headers.get('X-Captcha-Id') || ''
+      const svg = await response.text()
+      setCaptchaId(captchaId)
+      setCaptchaImage(`data:image/svg+xml;base64,${btoa(svg)}`)
+    } catch (error) {
+      console.error('Failed to fetch captcha:', error)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nickname.trim() || !content.trim() || !captcha.trim()) return
+
+    setIsSubmitting(true)
+    setSubmitMessage(null)
+
+    try {
+      const result = await api.post('/comments', {
+        nickname: nickname.trim(),
+        content: content.trim(),
+        captcha: captcha.trim(),
+        captchaId,
+        postId,
+      }) as { code: number; message: string }
+
+      if (result.code === 2000 || result.code === 2010) {
+        setSubmitMessage({ type: 'success', text: '评论提交成功，等待审核后显示' })
+        setNickname('')
+        setContent('')
+        setCaptcha('')
+        fetchCaptcha()
+      } else {
+        setSubmitMessage({ type: 'error', text: result.message || '评论提交失败' })
+      }
+    } catch (error: any) {
+      setSubmitMessage({ type: 'error', text: error?.message || '评论提交失败' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
   }
 
   return (
@@ -58,7 +112,7 @@ export function CommentSection() {
       </div>
 
       {/* Comment Form */}
-      <form className="p-6 space-y-4 border-b border-border">
+      <form onSubmit={handleSubmit} className="p-6 space-y-4 border-b border-border">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
@@ -66,7 +120,10 @@ export function CommentSection() {
             </label>
             <input
               type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
               placeholder="请输入昵称"
+              maxLength={20}
               className="w-full bg-sidebar-active/20 dark:bg-sidebar-active/10 border border-border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               required
             />
@@ -78,16 +135,22 @@ export function CommentSection() {
             <div className="flex gap-2">
               <input
                 type="text"
+                value={captcha}
+                onChange={(e) => setCaptcha(e.target.value)}
                 placeholder="4位验证码"
+                maxLength={4}
                 className="flex-1 bg-sidebar-active/20 dark:bg-sidebar-active/10 border border-border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 required
               />
-              <div
-                onClick={refreshCaptcha}
-                className="w-24 bg-primary/10 text-primary font-mono font-bold flex items-center justify-center rounded-lg cursor-pointer hover:bg-primary/20 transition-colors select-none"
-              >
-                {captcha}
-              </div>
+              {captchaImage && (
+                <img
+                  src={captchaImage}
+                  alt="验证码"
+                  className="w-24 h-10 bg-primary/10 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={fetchCaptcha}
+                  title="点击刷新验证码"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -97,9 +160,12 @@ export function CommentSection() {
             内容 *
           </label>
           <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
             rows={4}
             placeholder="说点什么吧... (最多500字)"
-            className="w-full bg-sidebar-active/20 dark:bg-sidebar-active/10 border border-border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
+            maxLength={500}
+            className="w-full bg-sidebar-active/20 dark:bg-sidebar-active/10 border border-border rounded-lg px-3 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
             required
           />
         </div>
@@ -110,66 +176,90 @@ export function CommentSection() {
           </p>
           <button
             type="submit"
-            className="flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+            disabled={isSubmitting || !nickname.trim() || !content.trim() || !captcha.trim()}
+            className={cn(
+              'flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 active:scale-95',
+              isSubmitting || !nickname.trim() || !content.trim() || !captcha.trim()
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-primary text-white hover:bg-primary/90'
+            )}
           >
-            <Send size={16} />
-            发表评论
+            {isSubmitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                提交中...
+              </>
+            ) : (
+              <>
+                <Send size={16} />
+                发表评论
+              </>
+            )}
           </button>
         </div>
+
+        {submitMessage && (
+          <p className={cn(
+            'text-sm font-medium',
+            submitMessage.type === 'success' ? 'text-green-600' : 'text-red-600'
+          )}>
+            {submitMessage.text}
+          </p>
+        )}
       </form>
 
       {/* Comment List */}
       <div className="space-y-6">
-        {mockComments.map((comment) => (
-          <div key={comment.id} className="space-y-4">
-            <div className="flex gap-4">
-              <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-text-muted flex-shrink-0">
-                <User size={20} />
-              </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-text-main">
-                    {comment.nickname}
-                  </span>
-                  <span className="text-xs text-text-muted">{comment.date}</span>
+        {isLoading ? (
+          <div className="text-center py-8 text-text-muted">加载中...</div>
+        ) : comments.length > 0 ? (
+          comments.map((comment) => (
+            <div key={comment.id} className="space-y-4">
+              <CommentItem comment={comment} formatDate={formatDate} />
+              {/* Replies */}
+              {comment.children && comment.children.length > 0 && (
+                <div className="ml-14 space-y-4">
+                  {comment.children.map((reply) => (
+                    <CommentItem key={reply.id} comment={reply} formatDate={formatDate} isReply />
+                  ))}
                 </div>
-                <p className="text-sm text-text-muted leading-relaxed">
-                  {comment.content}
-                </p>
-                <button className="flex items-center gap-1 text-[10px] text-primary hover:underline font-bold">
-                  <Reply size={12} />
-                  回复
-                </button>
-              </div>
+              )}
             </div>
-
-            {/* Replies */}
-            {comment.replies?.map((reply) => (
-              <div
-                key={reply.id}
-                className="ml-14 flex gap-4 bg-sidebar-active/20 dark:bg-sidebar-active/10 p-4 rounded-xl border border-border/50"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-                  <User size={16} />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-primary">
-                      {reply.nickname}
-                    </span>
-                    <span className="text-[10px] text-text-muted">
-                      {reply.date}
-                    </span>
-                  </div>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    {reply.content}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
+          ))
+        ) : (
+          <div className="text-center py-8 text-text-muted">暂无评论，快来抢沙发吧！</div>
+        )}
       </div>
     </section>
+  )
+}
+
+interface CommentItemProps {
+  comment: Comment
+  formatDate: (date: string) => string
+  isReply?: boolean
+}
+
+function CommentItem({ comment, formatDate, isReply }: CommentItemProps) {
+  return (
+    <div className="flex gap-4">
+      <div className={cn(
+        'rounded-full flex items-center justify-center flex-shrink-0',
+        isReply ? 'w-8 h-8 bg-primary/10' : 'w-10 h-10 bg-gray-100 dark:bg-gray-800'
+      )}>
+        <User size={isReply ? 16 : 20} className={isReply ? 'text-primary' : 'text-text-muted'} />
+      </div>
+      <div className="flex-1 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-text-main">
+            {comment.nickname}
+          </span>
+          <span className="text-xs text-text-muted">{formatDate(comment.createdAt)}</span>
+        </div>
+        <p className="text-sm text-text-muted leading-relaxed">
+          {comment.content}
+        </p>
+      </div>
+    </div>
   )
 }
