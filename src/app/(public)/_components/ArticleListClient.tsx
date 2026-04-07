@@ -67,10 +67,10 @@ export function ArticleListClient({
         const response = await fetch(`/api/posts?${params.toString()}`)
         const result = await response.json()
 
-        if (result.success && result.data) {
-          setPosts(result.data)
-          setPage(result.page)
-          setTotalPages(result.totalPages)
+        if (result.code === 2000 && result.data) {
+          setPosts(result.data.posts)
+          setPage(result.data.page)
+          setTotalPages(result.data.totalPages)
 
           // Scroll to top
           window.scrollTo({ top: 0, behavior: 'smooth' })

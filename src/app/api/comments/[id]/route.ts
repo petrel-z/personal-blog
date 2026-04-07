@@ -9,8 +9,9 @@ import { deleteComment } from '@/server/features/comment'
 import { prisma } from '@/server/db'
 import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
+import { success, errors } from '@/lib/api-response'
 
-// GET /api/comments/[id]
+ // GET /api/comments/[id]
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -30,19 +31,13 @@ export async function GET(
     })
 
     if (!comment) {
-      return NextResponse.json(
-        { success: false, error: '评论不存在' },
-        { status: 404 }
-      )
+      return NextResponse.json(errors.notFound('评论不存在'))
     }
 
-    return NextResponse.json({ success: true, data: comment })
+    return NextResponse.json(success(comment))
   } catch (error) {
     console.error('Failed to fetch comment:', error)
-    return NextResponse.json(
-      { success: false, error: '获取评论失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取评论失败'))
   }
 }
 
@@ -71,12 +66,9 @@ export async function DELETE(
       }, request)
     }
 
-    return NextResponse.json({ success: true, message: '删除成功' })
+    return NextResponse.json(success(null, '删除成功'))
   } catch (error) {
     console.error('Failed to delete comment:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : '删除评论失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError(error instanceof Error ? error.message : '删除评论失败'))
   }
 }

@@ -4,6 +4,7 @@
 
 import { NextResponse } from 'next/server'
 import { getOverviewStats, getTrendingPosts, getViewStats } from '@/server/features/stats'
+import { success, errors } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,23 +17,20 @@ export async function GET(request: Request) {
 
     if (type === 'trending' || type === 'popular') {
       const posts = await getTrendingPosts(timeframe)
-      return NextResponse.json({ success: true, data: posts })
+      return NextResponse.json(success(posts))
     }
 
     if (type === 'views') {
       const viewsTimeframe = (searchParams.get('timeframe') as '7d' | '30d' | '90d') || '7d'
       const stats = await getViewStats(viewsTimeframe)
-      return NextResponse.json({ success: true, data: stats })
+      return NextResponse.json(success(stats))
     }
 
     // 默认返回概览统计
     const stats = await getOverviewStats()
-    return NextResponse.json({ success: true, data: stats })
+    return NextResponse.json(success(stats))
   } catch (error) {
     console.error('Failed to fetch stats:', error)
-    return NextResponse.json(
-      { success: false, error: '获取统计数据失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取统计数据失败'))
   }
 }

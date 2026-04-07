@@ -51,21 +51,21 @@ export default function PostEditPage() {
 
       // Fetch categories and tags in parallel
       const [categoriesResult, tagsResult] = await Promise.all([
-        api.get<Category[]>('/categories'),
-        api.get<Tag[]>('/tags'),
+        api.get('/categories') as unknown as { code: number; data: { items: Category[] }; message: string },
+        api.get('/tags') as unknown as { code: number; data: { items: Tag[] }; message: string },
       ])
 
-      if (categoriesResult.success) {
-        setCategories(categoriesResult.data || [])
+      if (categoriesResult.code === 2000) {
+        setCategories(categoriesResult.data?.items || [])
       }
-      if (tagsResult.success) {
-        setAllTags(tagsResult.data || [])
+      if (tagsResult.code === 2000) {
+        setAllTags(tagsResult.data?.items || [])
       }
 
       // Fetch post if editing
       if (id && id !== 'new') {
-        const postResult = await api.get<PostWithRelations>(`/posts/${id}`)
-        if (postResult.success && postResult.data) {
+        const postResult = await api.get(`/posts/${id}`) as unknown as { code: number; data: PostWithRelations; message: string }
+        if (postResult.code === 2000 && postResult.data) {
           const p = postResult.data as PostWithRelations & { isPinned?: boolean }
           setPost(p)
           setFormData({
@@ -105,7 +105,7 @@ export default function PostEditPage() {
         result = await api.post('/posts', data)
       }
 
-      if (result.success) {
+      if (result.code === 2000) {
         setSaveStatus('saved')
         if (id === 'new' && result.data) {
           // Redirect to edit page with new ID

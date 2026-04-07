@@ -30,11 +30,11 @@ export default function PostsPage() {
         params.status = filter
       }
 
-      const result = await api.get<{ posts: PostWithRelations[]; total: number; totalPages: number }>('/posts', params)
+      const result = await api.get('/posts', params) as { code: number; data: { items: PostWithRelations[]; total: number; totalPages: number }; message: string }
 
-      if (result.success && result.data) {
+      if (result.code === 2000 && result.data) {
         // Filter by search if needed (client-side for simplicity)
-        let filteredPosts = result.data.posts || []
+        let filteredPosts = result.data.items || []
         if (search) {
           filteredPosts = filteredPosts.filter(p =>
             p.title.toLowerCase().includes(search.toLowerCase())
@@ -56,7 +56,7 @@ export default function PostsPage() {
 
     try {
       const result = await api.delete(`/posts/${id}`)
-      if (result.success) {
+      if (result.code === 2000) {
         fetchPosts()
       }
     } catch {

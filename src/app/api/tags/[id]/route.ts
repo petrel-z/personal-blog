@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { updateTag, deleteTag } from '@/server/features/tag'
+import { success, errors } from '@/lib/api-response'
 
 const updateTagSchema = z.object({
   name: z.string().min(1).max(20).optional(),
@@ -24,20 +25,16 @@ export async function PUT(
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError(validated.error.flatten().fieldErrors?.name?.[0] || '数据验证失败')
       )
     }
 
     const tag = await updateTag(params.id, validated.data)
 
-    return NextResponse.json({ success: true, data: tag })
+    return NextResponse.json(success(tag))
   } catch (error) {
     console.error('Failed to update tag:', error)
-    return NextResponse.json(
-      { success: false, error: '更新标签失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('更新标签失败'))
   }
 }
 
@@ -49,12 +46,9 @@ export async function DELETE(
   try {
     await deleteTag(params.id)
 
-    return NextResponse.json({ success: true, message: '删除成功' })
+    return NextResponse.json(success(null, '删除成功'))
   } catch (error) {
     console.error('Failed to delete tag:', error)
-    return NextResponse.json(
-      { success: false, error: '删除标签失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('删除标签失败'))
   }
 }

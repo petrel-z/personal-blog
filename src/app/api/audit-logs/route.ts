@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getAuditLogs, createAuditLog } from '@/server/features/audit-log'
+import { success, created, errors, paginated } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,20 +39,12 @@ export async function GET(request: Request) {
       endDate: endDate ? new Date(endDate) : undefined,
     })
 
-    return NextResponse.json({
-      success: true,
-      data: result.logs,
-      total: result.total,
-      page: result.page,
-      pageSize: result.pageSize,
-      totalPages: result.totalPages,
-    })
+    return NextResponse.json(
+      paginated(result.logs, result.total, result.page, result.pageSize)
+    )
   } catch (error) {
     console.error('Failed to fetch audit logs:', error)
-    return NextResponse.json(
-      { success: false, error: '获取审计日志失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取审计日志失败'))
   }
 }
 
@@ -63,19 +56,14 @@ export async function POST(request: Request) {
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
-      )
+        errors.validationError('审计日志验证失败'))
     }
 
     const log = await createAuditLog(validated.data)
 
-    return NextResponse.json({ success: true, data: log }, { status: 201 })
+    return NextResponse.json(created(log), { status: 201 })
   } catch (error) {
     console.error('Failed to create audit log:', error)
-    return NextResponse.json(
-      { success: false, error: '创建审计日志失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('创建审计日志失败'))
   }
 }

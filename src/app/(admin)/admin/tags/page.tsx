@@ -29,9 +29,9 @@ export default function TagsPage() {
   const fetchTags = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get<TagWithCount[]>('/tags')
-      if (result.success && result.data) {
-        setTags(result.data)
+      const result = await api.get('/tags') as { code: number; data: { items: TagWithCount[]; total: number; totalPages: number }; message: string }
+      if (result.code === 2000 && result.data) {
+        setTags(result.data.items || [])
       }
     } catch {
       setError('获取标签失败')
@@ -47,13 +47,13 @@ export default function TagsPage() {
     try {
       if (editingTag) {
         const result = await api.put(`/tags/${editingTag.id}`, formData)
-        if (result.success) {
+        if (result.code === 2000) {
           fetchTags()
           closeDialog()
         }
       } else {
         const result = await api.post('/tags', formData)
-        if (result.success) {
+        if (result.code === 2000) {
           fetchTags()
           closeDialog()
         }
@@ -76,7 +76,7 @@ export default function TagsPage() {
 
     try {
       const result = await api.delete(`/tags/${id}`)
-      if (result.success) {
+      if (result.code === 2000) {
         fetchTags()
       }
     } catch {

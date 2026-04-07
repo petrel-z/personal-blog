@@ -40,11 +40,11 @@ export default function CommentsPage() {
         params.status = filter
       }
 
-      const result = await api.get<{ comments: AdminComment[]; total: number }>('/comments/admin', params)
+      const result = await api.get('/comments/admin', params) as { code: number; data: { items: AdminComment[]; total: number; totalPages: number }; message: string }
 
-      if (result.success && result.data) {
-        setComments(result.data.comments || [])
-        setTotalPages(result.totalPages || 1)
+      if (result.code === 2000 && result.data) {
+        setComments(result.data.items || [])
+        setTotalPages(result.data.totalPages || 1)
       }
     } catch {
       setError('获取评论列表失败')
@@ -56,7 +56,7 @@ export default function CommentsPage() {
   const handleApprove = async (id: string) => {
     try {
       const result = await api.put(`/comments/${id}/moderate`, { action: 'approve' })
-      if (result.success) {
+      if (result.code === 2000) {
         fetchComments()
       }
     } catch {
@@ -67,7 +67,7 @@ export default function CommentsPage() {
   const handleReject = async (id: string) => {
     try {
       const result = await api.put(`/comments/${id}/moderate`, { action: 'reject' })
-      if (result.success) {
+      if (result.code === 2000) {
         fetchComments()
       }
     } catch {
@@ -80,7 +80,7 @@ export default function CommentsPage() {
 
     try {
       const result = await api.delete(`/comments/${id}`)
-      if (result.success) {
+      if (result.code === 2000) {
         fetchComments()
       }
     } catch {

@@ -48,19 +48,19 @@ export default function DashboardPage() {
 
       // Fetch all data in parallel
       const [statsResult, popularResult, commentsResult] = await Promise.all([
-        api.get<OverviewStats>('/stats'),
-        api.get<PostWithRelations[]>('/stats', { type: 'popular', timeframe: 'week' }),
-        api.get<RecentComment[]>('/comments/admin', { pageSize: 5 }),
+        api.get('/stats') as unknown as { code: number; data: OverviewStats; message: string },
+        api.get('/stats', { type: 'popular', timeframe: 'week' }) as unknown as { code: number; data: { items: PostWithRelations[] }; message: string },
+        api.get('/comments/admin', { pageSize: 5 }) as unknown as { code: number; data: { items: RecentComment[] }; message: string },
       ])
 
-      if (statsResult.success && statsResult.data) {
+      if (statsResult.code === 2000 && statsResult.data) {
         setStats(statsResult.data)
       }
-      if (popularResult.success && popularResult.data) {
-        setPopularPosts(popularResult.data.slice(0, 5))
+      if (popularResult.code === 2000 && popularResult.data) {
+        setPopularPosts(popularResult.data.items.slice(0, 5))
       }
-      if (commentsResult.success && commentsResult.data) {
-        setRecentComments(commentsResult.data)
+      if (commentsResult.code === 2000 && commentsResult.data) {
+        setRecentComments(commentsResult.data.items)
       }
     } catch {
       console.error('Failed to fetch dashboard data')

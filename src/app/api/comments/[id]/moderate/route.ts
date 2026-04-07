@@ -9,6 +9,7 @@ import { moderateComment } from '@/server/features/comment'
 import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 import { prisma } from '@/server/db'
+import { success, errors } from '@/lib/api-response'
 
 const moderateSchema = z.object({
   action: z.enum(['approve', 'reject']),
@@ -26,8 +27,7 @@ export async function PUT(
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError('无效的审核操作')
       )
     }
 
@@ -51,15 +51,13 @@ export async function PUT(
     }
 
     return NextResponse.json({
-      success: true,
+      ...success(moderatedComment),
       message: validated.data.action === 'approve' ? '评论已通过' : '评论已拒绝',
-      data: moderatedComment,
     })
   } catch (error) {
     console.error('Failed to moderate comment:', error)
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : '审核评论失败' },
-      { status: 500 }
+      errors.serverError(error instanceof Error ? error.message : '审核评论失败')
     )
   }
 }

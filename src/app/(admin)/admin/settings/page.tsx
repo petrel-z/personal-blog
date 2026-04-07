@@ -40,8 +40,8 @@ export default function SettingsPage() {
   const fetchSettings = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get<SiteSettings>('/settings')
-      if (result.success && result.data) {
+      const result = await api.get('/settings') as { code: number; data: SiteSettings; message: string }
+      if (result.code === 2000 && result.data) {
         setSettings(result.data)
       }
     } catch {
@@ -59,7 +59,7 @@ export default function SettingsPage() {
 
     try {
       const result = await api.put('/settings', settings)
-      if (result.success) {
+      if (result.code === 2000) {
         setSuccess(true)
         setTimeout(() => setSuccess(false), 3000)
       } else {

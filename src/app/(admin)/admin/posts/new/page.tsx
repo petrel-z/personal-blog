@@ -35,15 +35,15 @@ export default function NewPostPage() {
       setIsLoading(true)
 
       const [categoriesResult, tagsResult] = await Promise.all([
-        api.get<Category[]>('/categories'),
-        api.get<Tag[]>('/tags'),
+        api.get('/categories') as unknown as { code: number; data: { items: Category[] }; message: string },
+        api.get('/tags') as unknown as { code: number; data: { items: Tag[] }; message: string },
       ])
 
-      if (categoriesResult.success) {
-        setCategories(categoriesResult.data || [])
+      if (categoriesResult.code === 2000) {
+        setCategories(categoriesResult.data?.items || [])
       }
-      if (tagsResult.success) {
-        setAllTags(tagsResult.data || [])
+      if (tagsResult.code === 2000) {
+        setAllTags(tagsResult.data?.items || [])
       }
     } catch {
       setError('获取数据失败')
@@ -64,7 +64,7 @@ export default function NewPostPage() {
 
       const result = await api.post('/posts', data)
 
-      if (result.success) {
+      if (result.code === 2000) {
         // Redirect to posts list
         window.location.href = '/admin/posts'
       } else {

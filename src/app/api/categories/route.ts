@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCategories, createCategory } from '@/server/features/category'
+import { success, created, errors } from '@/lib/api-response'
 
 const createCategorySchema = z.object({
   name: z.string().min(1).max(50),
@@ -16,13 +17,10 @@ const createCategorySchema = z.object({
 export async function GET() {
   try {
     const categories = await getCategories()
-    return NextResponse.json({ success: true, data: categories })
+    return NextResponse.json(success(categories))
   } catch (error) {
     console.error('Failed to fetch categories:', error)
-    return NextResponse.json(
-      { success: false, error: '获取分类列表失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取分类列表失败'))
   }
 }
 
@@ -34,19 +32,15 @@ export async function POST(request: Request) {
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError(validated.error.flatten().fieldErrors?.name?.[0] || '数据验证失败')
       )
     }
 
     const category = await createCategory(validated.data)
 
-    return NextResponse.json({ success: true, data: category }, { status: 201 })
+    return NextResponse.json(created(category), { status: 201 })
   } catch (error) {
     console.error('Failed to create category:', error)
-    return NextResponse.json(
-      { success: false, error: '创建分类失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('创建分类失败'))
   }
 }

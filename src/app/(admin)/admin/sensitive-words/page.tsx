@@ -31,9 +31,9 @@ export default function SensitiveWordsPage() {
   const fetchWords = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get<SensitiveWord[]>('/sensitive-words')
-      if (result.success && result.data) {
-        setWords(result.data)
+      const result = await api.get('/sensitive-words') as { code: number; data: { items: SensitiveWord[]; total: number; totalPages: number }; message: string }
+      if (result.code === 2000 && result.data) {
+        setWords(result.data.items || [])
       }
     } catch {
       setError('获取敏感词失败')
@@ -49,13 +49,13 @@ export default function SensitiveWordsPage() {
     try {
       if (editingWord) {
         const result = await api.put(`/sensitive-words/${editingWord.id}`, formData)
-        if (result.success) {
+        if (result.code === 2000) {
           fetchWords()
           closeDialog()
         }
       } else {
         const result = await api.post('/sensitive-words', formData)
-        if (result.success) {
+        if (result.code === 2000) {
           fetchWords()
           closeDialog()
         }
@@ -78,7 +78,7 @@ export default function SensitiveWordsPage() {
 
     try {
       const result = await api.delete(`/sensitive-words/${id}`)
-      if (result.success) {
+      if (result.code === 2000) {
         fetchWords()
       }
     } catch {
@@ -92,7 +92,7 @@ export default function SensitiveWordsPage() {
         ...word,
         isActive: !word.isActive,
       })
-      if (result.success) {
+      if (result.code === 2000) {
         fetchWords()
       }
     } catch {

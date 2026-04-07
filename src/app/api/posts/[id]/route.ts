@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { getPostById, updatePost, deletePost } from '@/server/features/post'
 import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
+import { success, errors } from '@/lib/api-response'
 
 const updatePostSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -31,19 +32,13 @@ export async function GET(
     const post = await getPostById(params.id)
 
     if (!post) {
-      return NextResponse.json(
-        { success: false, error: '文章不存在' },
-        { status: 404 }
-      )
+      return NextResponse.json(errors.notFound('文章不存在'))
     }
 
-    return NextResponse.json({ success: true, data: post })
+    return NextResponse.json(success(post))
   } catch (error) {
     console.error('Failed to fetch post:', error)
-    return NextResponse.json(
-      { success: false, error: '获取文章失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取文章失败'))
   }
 }
 
@@ -59,8 +54,7 @@ export async function PATCH(
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError(validated.error.flatten().fieldErrors?.title?.[0] || '数据验证失败')
       )
     }
 
@@ -81,13 +75,10 @@ export async function PATCH(
       }, request)
     }
 
-    return NextResponse.json({ success: true, data: post })
+    return NextResponse.json(success(post))
   } catch (error) {
     console.error('Failed to update post:', error)
-    return NextResponse.json(
-      { success: false, error: '更新文章失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('更新文章失败'))
   }
 }
 
@@ -113,12 +104,9 @@ export async function DELETE(
       }, request)
     }
 
-    return NextResponse.json({ success: true, message: '删除成功' })
+    return NextResponse.json(success(null, '删除成功'))
   } catch (error) {
     console.error('Failed to delete post:', error)
-    return NextResponse.json(
-      { success: false, error: '删除文章失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('删除文章失败'))
   }
 }

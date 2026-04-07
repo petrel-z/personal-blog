@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     if (!captchaId || !code) {
       return NextResponse.json(
-        { success: false, error: '缺少验证码参数' },
+        { code: 4000, message: '缺少验证码参数', data: null, timestamp: Date.now() },
         { status: 400 }
       )
     }
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     if (!stored) {
       return NextResponse.json(
-        { success: false, error: '验证码已过期' },
+        { code: 4010, message: '验证码已过期', data: null, timestamp: Date.now() },
         { status: 400 }
       )
     }
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     if (stored.expiresAt < Date.now()) {
       captchaStore.delete(captchaId)
       return NextResponse.json(
-        { success: false, error: '验证码已过期' },
+        { code: 4010, message: '验证码已过期', data: null, timestamp: Date.now() },
         { status: 400 }
       )
     }
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     if (stored.code.toLowerCase() !== code.toLowerCase()) {
       captchaStore.delete(captchaId)
       return NextResponse.json(
-        { success: false, error: '验证码错误' },
+        { code: 4010, message: '验证码错误', data: null, timestamp: Date.now() },
         { status: 400 }
       )
     }
@@ -71,10 +71,10 @@ export async function POST(request: Request) {
     // Captcha verified, remove it
     captchaStore.delete(captchaId)
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ code: 2000, message: '验证成功', data: null, timestamp: Date.now() })
   } catch {
     return NextResponse.json(
-      { success: false, error: '验证失败' },
+      { code: 5000, message: '验证失败', data: null, timestamp: Date.now() },
       { status: 500 }
     )
   }

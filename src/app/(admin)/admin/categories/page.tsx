@@ -29,9 +29,9 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get<CategoryWithCount[]>('/categories')
-      if (result.success && result.data) {
-        setCategories(result.data)
+      const result = await api.get('/categories') as { code: number; data: { items: CategoryWithCount[]; total: number; totalPages: number }; message: string }
+      if (result.code === 2000 && result.data) {
+        setCategories(result.data.items || [])
       }
     } catch {
       setError('获取分类失败')
@@ -48,14 +48,14 @@ export default function CategoriesPage() {
       if (editingCategory) {
         // Update
         const result = await api.put(`/categories/${editingCategory.id}`, formData)
-        if (result.success) {
+        if (result.code === 2000) {
           fetchCategories()
           closeDialog()
         }
       } else {
         // Create
         const result = await api.post('/categories', formData)
-        if (result.success) {
+        if (result.code === 2000) {
           fetchCategories()
           closeDialog()
         }
@@ -78,7 +78,7 @@ export default function CategoriesPage() {
 
     try {
       const result = await api.delete(`/categories/${id}`)
-      if (result.success) {
+      if (result.code === 2000) {
         fetchCategories()
       }
     } catch {

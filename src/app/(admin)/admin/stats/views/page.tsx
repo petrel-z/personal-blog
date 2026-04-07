@@ -31,8 +31,8 @@ export default function StatsViewsPage() {
   const fetchStats = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get<{ views: ViewStats[]; overview: OverviewStats }>('/stats/views', { period })
-      if (result.success && result.data) {
+      const result = await api.get('/stats/views', { period }) as { code: number; data: { views: ViewStats[]; overview: OverviewStats }; message: string }
+      if (result.code === 2000 && result.data) {
         setStats(result.data.views || [])
         setOverview(result.data.overview || null)
       }

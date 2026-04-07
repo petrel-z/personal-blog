@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSensitiveWords, createSensitiveWord } from '@/server/features/sensitive-word'
+import { success, created, errors, paginated } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,20 +25,12 @@ export async function GET(request: Request) {
 
     const result = await getSensitiveWords({ page, pageSize, category })
 
-    return NextResponse.json({
-      success: true,
-      data: result.words,
-      total: result.total,
-      page: result.page,
-      pageSize: result.pageSize,
-      totalPages: result.totalPages,
-    })
+    return NextResponse.json(
+      paginated(result.words, result.total, result.page, result.pageSize)
+    )
   } catch (error) {
     console.error('Failed to fetch sensitive words:', error)
-    return NextResponse.json(
-      { success: false, error: '获取敏感词列表失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取敏感词列表失败'))
   }
 }
 
@@ -49,22 +42,17 @@ export async function POST(request: Request) {
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
-      )
+        errors.validationError('敏感词验证失败'))
     }
 
     const sensitiveWord = await createSensitiveWord(validated.data)
 
     return NextResponse.json(
-      { success: true, data: sensitiveWord },
+      created(sensitiveWord),
       { status: 201 }
     )
   } catch (error) {
     console.error('Failed to create sensitive word:', error)
-    return NextResponse.json(
-      { success: false, error: '创建敏感词失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('创建敏感词失败'))
   }
 }

@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { updateSensitiveWord, deleteSensitiveWord } from '@/server/features/sensitive-word'
+import { success, errors } from '@/lib/api-response'
 
 const updateSensitiveWordSchema = z.object({
   word: z.string().min(1).max(50).optional(),
@@ -25,20 +26,15 @@ export async function PUT(
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
-      )
+        errors.validationError('敏感词验证失败'))
     }
 
     const sensitiveWord = await updateSensitiveWord(params.id, validated.data)
 
-    return NextResponse.json({ success: true, data: sensitiveWord })
+    return NextResponse.json(success(sensitiveWord))
   } catch (error) {
     console.error('Failed to update sensitive word:', error)
-    return NextResponse.json(
-      { success: false, error: '更新敏感词失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('更新敏感词失败'))
   }
 }
 
@@ -50,12 +46,9 @@ export async function DELETE(
   try {
     await deleteSensitiveWord(params.id)
 
-    return NextResponse.json({ success: true, message: '删除成功' })
+    return NextResponse.json(success(null, '删除成功'))
   } catch (error) {
     console.error('Failed to delete sensitive word:', error)
-    return NextResponse.json(
-      { success: false, error: '删除敏感词失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('删除敏感词失败'))
   }
 }

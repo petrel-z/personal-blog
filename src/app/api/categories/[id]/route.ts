@@ -12,6 +12,7 @@ import {
   updateCategory,
   deleteCategory,
 } from '@/server/features/category'
+import { success, errors } from '@/lib/api-response'
 
 const updateCategorySchema = z.object({
   name: z.string().min(1).max(50).optional(),
@@ -28,19 +29,13 @@ export async function GET(
     const category = await getCategoryBySlug(params.id)
 
     if (!category) {
-      return NextResponse.json(
-        { success: false, error: '分类不存在' },
-        { status: 404 }
-      )
+      return NextResponse.json(errors.notFound('分类不存在'))
     }
 
-    return NextResponse.json({ success: true, data: category })
+    return NextResponse.json(success(category))
   } catch (error) {
     console.error('Failed to fetch category:', error)
-    return NextResponse.json(
-      { success: false, error: '获取分类失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取分类失败'))
   }
 }
 
@@ -55,20 +50,16 @@ export async function PUT(
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError(validated.error.flatten().fieldErrors?.name?.[0] || '数据验证失败')
       )
     }
 
     const category = await updateCategory(params.id, validated.data)
 
-    return NextResponse.json({ success: true, data: category })
+    return NextResponse.json(success(category))
   } catch (error) {
     console.error('Failed to update category:', error)
-    return NextResponse.json(
-      { success: false, error: '更新分类失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('更新分类失败'))
   }
 }
 
@@ -80,12 +71,11 @@ export async function DELETE(
   try {
     await deleteCategory(params.id)
 
-    return NextResponse.json({ success: true, message: '删除成功' })
+    return NextResponse.json(success(null, '删除成功'))
   } catch (error) {
     console.error('Failed to delete category:', error)
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : '删除分类失败' },
-      { status: 500 }
+      errors.serverError(error instanceof Error ? error.message : '删除分类失败')
     )
   }
 }

@@ -20,9 +20,9 @@ export default function StatsPopularPage() {
   const fetchPopularPosts = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get<PostWithRelations[]>('/stats/popular', { period })
-      if (result.success && result.data) {
-        setPosts(result.data)
+      const result = await api.get('/stats/popular', { period }) as { code: number; data: { items: PostWithRelations[]; total: number; totalPages: number }; message: string }
+      if (result.code === 2000 && result.data) {
+        setPosts(result.data.items || [])
       }
     } catch {
       console.error('Failed to fetch popular posts')

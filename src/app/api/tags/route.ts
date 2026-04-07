@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getTags, createTag } from '@/server/features/tag'
+import { success, created, errors } from '@/lib/api-response'
 
 const createTagSchema = z.object({
   name: z.string().min(1).max(20),
@@ -20,13 +21,10 @@ const updateTagSchema = z.object({
 export async function GET() {
   try {
     const tags = await getTags()
-    return NextResponse.json({ success: true, data: tags })
+    return NextResponse.json(success(tags))
   } catch (error) {
     console.error('Failed to fetch tags:', error)
-    return NextResponse.json(
-      { success: false, error: '获取标签列表失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取标签列表失败'))
   }
 }
 
@@ -38,19 +36,15 @@ export async function POST(request: Request) {
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError(validated.error.flatten().fieldErrors?.name?.[0] || '数据验证失败')
       )
     }
 
     const tag = await createTag(validated.data)
 
-    return NextResponse.json({ success: true, data: tag }, { status: 201 })
+    return NextResponse.json(created(tag), { status: 201 })
   } catch (error) {
     console.error('Failed to create tag:', error)
-    return NextResponse.json(
-      { success: false, error: '创建标签失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('创建标签失败'))
   }
 }

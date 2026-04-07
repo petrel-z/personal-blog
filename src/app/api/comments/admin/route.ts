@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { getAdminComments } from '@/server/features/comment'
+import { success, errors, paginated } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,19 +25,11 @@ export async function GET(request: Request) {
       postId,
     })
 
-    return NextResponse.json({
-      success: true,
-      data: result.comments,
-      total: result.total,
-      page: result.page,
-      pageSize: result.pageSize,
-      totalPages: result.totalPages,
-    })
+    return NextResponse.json(
+      paginated(result.comments, result.total, result.page, result.pageSize)
+    )
   } catch (error) {
     console.error('Failed to fetch admin comments:', error)
-    return NextResponse.json(
-      { success: false, error: '获取评论列表失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取评论列表失败'))
   }
 }

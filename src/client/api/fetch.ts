@@ -1,7 +1,10 @@
 /**
  * 统一 API 请求封装
  * 基于 fetch API，提供 get/post/put/delete/patch 方法
+ * 响应格式符合文档规范：{ code, message, data, timestamp }
  */
+
+import { ApiCode } from '@/lib/api-response'
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>
@@ -9,19 +12,28 @@ interface FetchOptions extends RequestInit {
 
 interface ApiError {
   message: string
-  code?: string
+  code?: number
   errors?: Record<string, string[]>
 }
 
 interface ApiResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
-  message?: string
-  total?: number
-  page?: number
-  pageSize?: number
-  totalPages?: number
+  code: number
+  message: string
+  data: T | null
+  timestamp: number
+}
+
+interface PaginatedResponse<T> {
+  code: number
+  message: string
+  data: {
+    items: T[]
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }
+  timestamp: number
 }
 
 class FetchClient {
@@ -36,7 +48,7 @@ class FetchClient {
     endpoint: string,
     data?: unknown,
     options?: FetchOptions
-  ): Promise<ApiResponse<T>> {
+  ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
     // 处理 params
     let url = `${this.baseURL}${endpoint}`
     if (options?.params) {
@@ -68,11 +80,23 @@ class FetchClient {
 
       const result = await response.json()
 
+      // 检查 HTTP 状态码
       if (!response.ok) {
         return {
-          success: false,
-          error: result.error || `请求失败 (${response.status})`,
-          ...result,
+          code: result.code || response.status,
+          message: result.message || `请求失败 (${response.status})`,
+          data: null,
+          timestamp: result.timestamp || Date.now(),
+        }
+      }
+
+      // 检查业务状态码
+      if (result.code && result.code >= 4000) {
+        return {
+          code: result.code,
+          message: result.message || '请求失败',
+          data: null,
+          timestamp: result.timestamp || Date.now(),
         }
       }
 
@@ -80,13 +104,17 @@ class FetchClient {
     } catch (error) {
       if (error instanceof Error) {
         return {
-          success: false,
-          error: error.message || '网络错误，请检查连接',
+          code: ApiCode.SERVER_ERROR,
+          message: error.message || '网络错误，请检查连接',
+          data: null,
+          timestamp: Date.now(),
         }
       }
       return {
-        success: false,
-        error: '未知错误',
+        code: ApiCode.SERVER_ERROR,
+        message: '未知错误',
+        data: null,
+        timestamp: Date.now(),
       }
     }
   }
@@ -97,7 +125,7 @@ class FetchClient {
   async get<T>(
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>
-  ): Promise<ApiResponse<T>> {
+  ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
     return this.request<T>('GET', endpoint, undefined, { params })
   }
 
@@ -107,7 +135,7 @@ class FetchClient {
   async post<T>(
     endpoint: string,
     data?: unknown
-  ): Promise<ApiResponse<T>> {
+  ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
     return this.request<T>('POST', endpoint, data)
   }
 
@@ -117,7 +145,7 @@ class FetchClient {
   async put<T>(
     endpoint: string,
     data?: unknown
-  ): Promise<ApiResponse<T>> {
+  ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
     return this.request<T>('PUT', endpoint, data)
   }
 
@@ -127,7 +155,7 @@ class FetchClient {
   async patch<T>(
     endpoint: string,
     data?: unknown
-  ): Promise<ApiResponse<T>> {
+  ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
     return this.request<T>('PATCH', endpoint, data)
   }
 
@@ -137,7 +165,7 @@ class FetchClient {
   async delete<T>(
     endpoint: string,
     data?: unknown
-  ): Promise<ApiResponse<T>> {
+  ): Promise<ApiResponse<T> | PaginatedResponse<T>> {
     return this.request<T>('DELETE', endpoint, data)
   }
 }
@@ -146,4 +174,7 @@ class FetchClient {
 export const api = new FetchClient('/api')
 
 // 导出类型
-export type { ApiResponse, ApiError, FetchOptions }
+export type { ApiResponse, ApiError, FetchOptions, PaginatedResponse }
+
+// 导出 ApiCode 用于成功检查
+export { ApiCode }

@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { getPosts, createPost } from '@/server/features/post'
 import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
+import { success, created, errors, paginated } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,20 +42,12 @@ export async function GET(request: Request) {
       tagSlug,
     })
 
-    return NextResponse.json({
-      success: true,
-      data: result.posts,
-      total: result.total,
-      page: result.page,
-      pageSize: result.pageSize,
-      totalPages: result.totalPages,
-    })
+    return NextResponse.json(
+      paginated(result.posts, result.total, result.page, result.pageSize)
+    )
   } catch (error) {
     console.error('Failed to fetch posts:', error)
-    return NextResponse.json(
-      { success: false, error: '获取文章列表失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取文章列表失败'))
   }
 }
 
@@ -67,8 +60,7 @@ export async function POST(request: Request) {
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError(validated.error.flatten().fieldErrors?.title?.[0] || '数据验证失败')
       )
     }
 
@@ -84,12 +76,9 @@ export async function POST(request: Request) {
       }, request)
     }
 
-    return NextResponse.json({ success: true, data: post }, { status: 201 })
+    return NextResponse.json(created(post), { status: 201 })
   } catch (error) {
     console.error('Failed to create post:', error)
-    return NextResponse.json(
-      { success: false, error: '创建文章失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('创建文章失败'))
   }
 }

@@ -6,6 +6,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getComments, createComment } from '@/server/features/comment'
+import { success, errors, paginated } from '@/lib/api-response'
+import { ApiCode } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,20 +32,12 @@ export async function GET(request: Request) {
 
     const result = await getComments({ postId, page, pageSize })
 
-    return NextResponse.json({
-      success: true,
-      data: result.comments,
-      total: result.total,
-      page: result.page,
-      pageSize: result.pageSize,
-      totalPages: result.totalPages,
-    })
+    return NextResponse.json(
+      paginated(result.comments, result.total, result.page, result.pageSize)
+    )
   } catch (error) {
     console.error('Failed to fetch comments:', error)
-    return NextResponse.json(
-      { success: false, error: '获取评论列表失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('获取评论列表失败'))
   }
 }
 
@@ -55,8 +49,7 @@ export async function POST(request: Request) {
 
     if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: validated.error.flatten() },
-        { status: 400 }
+        errors.validationError(validated.error.flatten().fieldErrors?.content?.[0] || '数据验证失败')
       )
     }
 
@@ -74,8 +67,7 @@ export async function POST(request: Request) {
 
     if (!captchaResult.success) {
       return NextResponse.json(
-        { success: false, error: '验证码错误或已过期' },
-        { status: 400 }
+        errors.unauthorized('验证码错误或已过期')
       )
     }
 
@@ -93,25 +85,18 @@ export async function POST(request: Request) {
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: result.message },
-        { status: 429 }
+        errors.rateLimited(result.message)
       )
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: result.message,
-        data: result.comment,
-        needsApproval: result.needsApproval,
-      },
-      { status: 201 }
-    )
+    return NextResponse.json({
+      code: ApiCode.SUCCESS,
+      message: result.message,
+      data: result.comment,
+      timestamp: Date.now(),
+    }, { status: 201 })
   } catch (error) {
     console.error('Failed to create comment:', error)
-    return NextResponse.json(
-      { success: false, error: '评论提交失败' },
-      { status: 500 }
-    )
+    return NextResponse.json(errors.serverError('评论提交失败'))
   }
 }

@@ -34,10 +34,10 @@ export default function AuditLogsPage() {
   const fetchLogs = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get<AuditLog[]>('/audit-logs', { page, pageSize: 20 })
-      if (result.success) {
-        setLogs(result.data || [])
-        setTotalPages(result.totalPages || 1)
+      const result = await api.get('/audit-logs', { page, pageSize: 20 }) as { code: number; data: { items: AuditLog[]; total: number; totalPages: number }; message: string }
+      if (result.code === 2000 && result.data) {
+        setLogs(result.data.items || [])
+        setTotalPages(result.data.totalPages || 1)
       }
     } catch {
       setError('获取审计日志失败')
