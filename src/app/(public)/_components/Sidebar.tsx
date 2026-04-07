@@ -7,7 +7,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Home,
   LayoutGrid,
@@ -18,7 +18,7 @@ import {
   Archive,
   ChevronDown,
 } from 'lucide-react'
-import { categories } from './mock/data'
+import { api } from '@/client/api'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -31,9 +31,34 @@ const navItems = [
   { label: '归档', path: '/archive', icon: Archive },
 ]
 
+interface CategoryWithCount {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  postCount: number
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true)
+  const [categories, setCategories] = useState<CategoryWithCount[]>([])
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const result = await api.get('/categories') as unknown as { code: number; data: CategoryWithCount[]; message: string }
+      if (result.code === 2000 && result.data) {
+        // API returns data as array directly
+        setCategories(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error)
+    }
+  }
 
   return (
     <aside className="h-full flex flex-col bg-sidebar">
@@ -83,27 +108,31 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto min-h-0 px-4 custom-scrollbar">
         {isCategoriesOpen && (
           <ul className="pb-4">
-            {categories.map((cat) => {
-              const isActive = pathname === `/category/${cat.slug}`
-              return (
-                <li key={cat.id}>
-                  <Link
-                    href={`/category/${cat.slug}`}
-                    className={cn(
-                      'flex items-center justify-between px-6 py-2 text-sm transition-colors',
-                      isActive
-                        ? 'text-text-main bg-sidebar-active'
-                        : 'text-text-muted hover:text-text-main hover:bg-sidebar-active/50'
-                    )}
-                  >
-                    <span>{cat.name}</span>
-                    <span className="text-[10px] bg-sidebar-active/40 dark:bg-sidebar-active/20 px-1.5 py-0.5 rounded text-text-muted font-medium">
-                      {cat.count}
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
+            {categories.length === 0 ? (
+              <li className="px-6 py-2 text-sm text-text-muted">暂无分类</li>
+            ) : (
+              categories.map((cat) => {
+                const isActive = pathname === `/category/${cat.slug}`
+                return (
+                  <li key={cat.id}>
+                    <Link
+                      href={`/category/${cat.slug}`}
+                      className={cn(
+                        'flex items-center justify-between px-6 py-2 text-sm transition-colors',
+                        isActive
+                          ? 'text-text-main bg-sidebar-active'
+                          : 'text-text-muted hover:text-text-main hover:bg-sidebar-active/50'
+                      )}
+                    >
+                      <span>{cat.name}</span>
+                      <span className="text-[10px] bg-sidebar-active/40 dark:bg-sidebar-active/20 px-1.5 py-0.5 rounded text-text-muted font-medium">
+                        {cat.postCount || 0}
+                      </span>
+                    </Link>
+                  </li>
+                )
+              })
+            )}
           </ul>
         )}
       </div>

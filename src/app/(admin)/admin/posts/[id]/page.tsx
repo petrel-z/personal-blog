@@ -51,15 +51,16 @@ export default function PostEditPage() {
 
       // Fetch categories and tags in parallel
       const [categoriesResult, tagsResult] = await Promise.all([
-        api.get('/categories') as unknown as { code: number; data: { items: Category[] }; message: string },
-        api.get('/tags') as unknown as { code: number; data: { items: Tag[] }; message: string },
+        api.get('/categories') as unknown as { code: number; data: Category[]; message: string },
+        api.get('/tags') as unknown as { code: number; data: Tag[]; message: string },
       ])
 
-      if (categoriesResult.code === 2000) {
-        setCategories(categoriesResult.data?.items || [])
+      if (categoriesResult.code === 2000 && categoriesResult.data) {
+        // API returns data as array directly
+        setCategories(categoriesResult.data)
       }
-      if (tagsResult.code === 2000) {
-        setAllTags(tagsResult.data?.items || [])
+      if (tagsResult.code === 2000 && tagsResult.data) {
+        setAllTags(tagsResult.data)
       }
 
       // Fetch post if editing
@@ -105,7 +106,7 @@ export default function PostEditPage() {
         result = await api.post('/posts', data)
       }
 
-      if (result.code === 2000) {
+      if (result.code === 2000 || result.code === 2010) {
         setSaveStatus('saved')
         if (id === 'new' && result.data) {
           // Redirect to edit page with new ID
@@ -114,7 +115,7 @@ export default function PostEditPage() {
         setTimeout(() => setSaveStatus('idle'), 2000)
       } else {
         setSaveStatus('error')
-        setError('保存失败')
+        setError(result.message || '保存失败')
       }
     } catch {
       setSaveStatus('error')
@@ -299,13 +300,45 @@ export default function PostEditPage() {
           {/* Cover Image */}
           <div className="border rounded-lg p-4 space-y-4">
             <h3 className="font-medium">封面图片</h3>
-            <input
-              type="url"
-              value={formData.coverImage}
-              onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
-              placeholder="图片 URL"
-              className="w-full px-3 py-2 border rounded-lg"
-            />
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={formData.coverImage}
+                onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
+                placeholder="图片 URL"
+                className="flex-1 px-3 py-2 border rounded-lg"
+              />
+              <label className="px-4 py-2 bg-sidebar hover:bg-sidebar-active text-sm rounded-lg cursor-pointer transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+
+                    const uploadFormData = new FormData()
+                    uploadFormData.append('file', file)
+
+                    try {
+                      const res = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: uploadFormData,
+                      })
+                      const result = await res.json()
+                      if (result.code === 2000) {
+                        setFormData((prev) => ({ ...prev, coverImage: result.data.url }))
+                      } else {
+                        alert(result.message || '上传失败')
+                      }
+                    } catch {
+                      alert('上传失败')
+                    }
+                  }}
+                />
+                上传
+              </label>
+            </div>
             {formData.coverImage && (
               <div className="relative aspect-video rounded-lg overflow-hidden bg-sidebar">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -4,12 +4,13 @@
 
 'use client'
 
-import { useState, useMemo, Suspense } from 'react'
+import { useState, useMemo, Suspense, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'motion/react'
 import { Search as SearchIcon, X } from 'lucide-react'
-import { articles } from '../_components/mock/data'
+import { api } from '@/client/api'
+import type { PostWithRelations } from '@/shared/types'
 import { RightWidgets } from '../_components/RightWidgets'
 
 function SearchContent() {
@@ -17,21 +18,51 @@ function SearchContent() {
   const initialQuery = searchParams.get('q') || ''
 
   const [query, setQuery] = useState(initialQuery)
-  const [searchResults, setSearchResults] = useState<typeof articles>([])
+  const [searchResults, setSearchResults] = useState<PostWithRelations[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [hotTags, setHotTags] = useState<string[]>([])
 
-  const handleSearch = (searchQuery: string) => {
+  useEffect(() => {
+    fetchHotTags()
+  }, [])
+
+  const fetchHotTags = async () => {
+    try {
+      const result = await api.get('/tags') as unknown as { code: number; data: { items: { id: string; name: string; slug: string }[] }; message: string }
+      if (result.code === 2000 && result.data) {
+        setHotTags(result.data.items?.slice(0, 10).map(t => t.name) || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch tags:', error)
+    }
+  }
+
+  const handleSearch = async (searchQuery: string) => {
     setQuery(searchQuery)
     if (searchQuery.trim()) {
-      const results = articles.filter(
-        (article) =>
-          article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          article.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          article.tags.some((tag) =>
-            tag.toLowerCase().includes(searchQuery.toLowerCase())
+      setIsSearching(true)
+      try {
+        // Search by fetching all posts and filtering client-side for now
+        // TODO: Add a dedicated search endpoint
+        const result = await api.get('/posts', { page: 1, pageSize: 50, status: 'PUBLISHED' }) as unknown as { code: number; data: { items: PostWithRelations[] }; message: string }
+
+        if (result.code === 2000 && result.data) {
+          const results = result.data.items.filter((article) =>
+            article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            article.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            article.tags.some((tag) =>
+              tag.name.toLowerCase().includes(searchQuery.toLowerCase())
+            )
           )
-      )
-      setSearchResults(results)
+          setSearchResults(results)
+        }
+      } catch (error) {
+        console.error('Search failed:', error)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+      }
     } else {
       setSearchResults([])
     }
@@ -82,10 +113,10 @@ function SearchContent() {
         {query.trim() ? (
           <div className="space-y-4">
             <p className="text-sm text-text-muted">
-              找到 {searchResults.length} 篇相关文章
+              {isSearching ? '搜索中...' : `找到 ${searchResults.length} 篇相关文章`}
             </p>
 
-            {searchResults.length > 0 ? (
+            {!isSearching && searchResults.length > 0 ? (
               searchResults.map((article, index) => (
                 <motion.div
                   key={article.id}
@@ -99,14 +130,14 @@ function SearchContent() {
                   />
                 </motion.div>
               ))
-            ) : (
+            ) : !isSearching ? (
               <div className="text-center py-16">
                 <p className="text-text-muted">未找到相关文章</p>
                 <p className="text-sm text-text-muted mt-2">
                   试试其他关键词？
                 </p>
               </div>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="text-center py-16">
@@ -114,15 +145,27 @@ function SearchContent() {
             <div className="mt-8">
               <p className="text-sm text-text-muted mb-4">热门标签</p>
               <div className="flex flex-wrap justify-center gap-2">
-                {['linux', 'Kubernetes', 'docker', 'AI', 'git'].map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => handleSearch(tag)}
-                    className="px-3 py-1.5 bg-sidebar-active/50 text-text-muted rounded-full text-xs hover:bg-primary hover:text-white transition-colors"
-                  >
-                    {tag}
-                  </button>
-                ))}
+                {hotTags.length > 0 ? (
+                  hotTags.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => handleSearch(tag)}
+                      className="px-3 py-1.5 bg-sidebar-active/50 text-text-muted rounded-full text-xs hover:bg-primary hover:text-white transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))
+                ) : (
+                  ['linux', 'Kubernetes', 'docker', 'AI', 'git'].map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => handleSearch(tag)}
+                      className="px-3 py-1.5 bg-sidebar-active/50 text-text-muted rounded-full text-xs hover:bg-primary hover:text-white transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -141,9 +184,15 @@ function SearchResultCard({
   article,
   query,
 }: {
-  article: (typeof articles)[0]
+  article: PostWithRelations
   query: string
 }) {
+  const formatDate = (date: Date | string | null | undefined) => {
+    if (!date) return ''
+    const d = new Date(date)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
   // Highlight matching text
   const highlightText = (text: string) => {
     if (!query) return text
@@ -181,10 +230,10 @@ function SearchResultCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
-              {article.category}
+              {article.category?.name || '未分类'}
             </span>
             <span className="text-[10px] text-text-muted">
-              {article.publishDate}
+              {formatDate(article.publishedAt)}
             </span>
           </div>
 
@@ -195,18 +244,18 @@ function SearchResultCard({
           </Link>
 
           <p className="text-xs text-text-muted mt-1 line-clamp-2">
-            {highlightText(article.summary)}
+            {highlightText(article.summary || '')}
           </p>
 
           <div className="flex gap-2 mt-2">
             {article.tags
-              .filter((tag) => tag.toLowerCase().includes(query))
+              .filter((tag) => tag.name.toLowerCase().includes(query))
               .map((tag) => (
                 <span
-                  key={tag}
+                  key={tag.id}
                   className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full"
                 >
-                  #{tag}
+                  #{tag.name}
                 </span>
               ))}
           </div>

@@ -4,56 +4,99 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Calendar, Activity, Clock, FileText, Edit, Trash2 } from 'lucide-react'
-import { format, subDays } from 'date-fns'
+import { format, subDays, startOfYear, endOfYear, eachDayOfInterval, isSameYear } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { api } from '@/client/api'
+import type { AuditLog } from '@/shared/types'
 
 const today = new Date()
 
-const heatmapData = Array.from({ length: 365 }).map((_, i) => ({
-  date: format(subDays(today, i), 'yyyy-MM-dd'),
-  count: Math.floor(Math.random() * 5),
-}))
-
-const timelineData = [
-  {
-    id: '1',
-    type: 'publish',
-    title: '快速选出收益最高的理财产品',
-    date: '2025-06-15 10:30',
-    icon: FileText,
-    color: 'text-green-500',
-  },
-  {
-    id: '2',
-    type: 'edit',
-    title: 'ceph mon Operation not permitted 问题解决',
-    date: '2026-04-03 14:20',
-    icon: Edit,
-    color: 'text-blue-500',
-  },
-  {
-    id: '3',
-    type: 'delete',
-    title: '测试文章',
-    date: '2026-04-02 09:15',
-    icon: Trash2,
-    color: 'text-red-500',
-  },
-  {
-    id: '4',
-    type: 'publish',
-    title: 'Ascend 310P + openFuyao + NPU-Operator 故障排查',
-    date: '2026-04-01 11:00',
-    icon: FileText,
-    color: 'text-green-500',
-  },
-]
-
 export default function Archive() {
-  const [selectedYear, setSelectedYear] = useState(2026)
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear())
+  const [heatmapData, setHeatmapData] = useState<{ date: string; count: number }[]>([])
+  const [timelineData, setTimelineData] = useState<AuditLog[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetchData()
+  }, [selectedYear])
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true)
+
+      // Fetch audit logs for the selected year
+      const startDate = format(startOfYear(new Date(selectedYear, 0, 1)), 'yyyy-MM-dd')
+      const endDate = format(endOfYear(new Date(selectedYear, 0, 1)), 'yyyy-MM-dd')
+
+      const result = await api.get('/audit-logs', {
+        page: 1,
+        pageSize: 100,
+        startDate,
+        endDate,
+      }) as unknown as { code: number; data: { items: AuditLog[]; total: number }; message: string }
+
+      if (result.code === 2000 && result.data) {
+        const logs = result.data.items || []
+
+        // Process heatmap data - count posts per day
+        const dayCount: Record<string, number> = {}
+        logs.forEach((log) => {
+          if (log.action.includes('POST')) {
+            const date = format(new Date(log.createdAt), 'yyyy-MM-dd')
+            dayCount[date] = (dayCount[date] || 0) + 1
+          }
+        })
+
+        // Generate heatmap data for the year
+        const yearStart = startOfYear(new Date(selectedYear, 0, 1))
+        const yearEnd = endOfYear(new Date(selectedYear, 0, 1))
+        const daysInYear = eachDayOfInterval({ start: yearStart, end: yearEnd })
+
+        const heatmap = daysInYear.map((day) => ({
+          date: format(day, 'yyyy-MM-dd'),
+          count: dayCount[format(day, 'yyyy-MM-dd')] || 0,
+        }))
+
+        setHeatmapData(heatmap)
+        setTimelineData(logs.slice(0, 20)) // Show recent 20 activities
+      }
+    } catch (error) {
+      console.error('Failed to fetch archive data:', error)
+      // Generate empty heatmap data
+      const yearStart = startOfYear(new Date(selectedYear, 0, 1))
+      const yearEnd = endOfYear(new Date(selectedYear, 0, 1))
+      const daysInYear = eachDayOfInterval({ start: yearStart, end: yearEnd })
+      setHeatmapData(daysInYear.map((day) => ({ date: format(day, 'yyyy-MM-dd'), count: 0 })))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getActivityIcon = (action: string) => {
+    if (action.includes('CREATE') || action.includes('POST')) return FileText
+    if (action.includes('UPDATE') || action.includes('EDIT')) return Edit
+    if (action.includes('DELETE')) return Trash2
+    return FileText
+  }
+
+  const getActivityColor = (action: string) => {
+    if (action.includes('CREATE') || action.includes('POST')) return 'text-green-500'
+    if (action.includes('UPDATE') || action.includes('EDIT')) return 'text-blue-500'
+    if (action.includes('DELETE')) return 'text-red-500'
+    return 'text-gray-500'
+  }
+
+  const getActivityLabel = (action: string) => {
+    if (action.includes('CREATE') || action.includes('POST')) return '发布'
+    if (action.includes('UPDATE') || action.includes('EDIT')) return '编辑'
+    if (action.includes('DELETE')) return '删除'
+    if (action.includes('LOGIN')) return '登录'
+    return action
+  }
 
   return (
     <motion.div
@@ -94,47 +137,138 @@ export default function Archive() {
               onChange={(e) => setSelectedYear(Number(e.target.value))}
               className="bg-sidebar-active/20 dark:bg-sidebar-active/10 border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all"
             >
-              <option value={2026}>2026年</option>
-              <option value={2025}>2025年</option>
-              <option value={2024}>2024年</option>
+              {[2026, 2025, 2024, 2023].map((year) => (
+                <option key={year} value={year}>{year}年</option>
+              ))}
             </select>
           </div>
 
           {/* Simple Heatmap Grid */}
-          <div className="overflow-x-auto pb-4">
-            <div className="grid grid-rows-7 grid-flow-col gap-1 min-w-[800px]">
-              {/* Weekday labels */}
-              <div className="flex flex-col gap-1 pr-2 text-[10px] text-text-muted justify-around">
-                <span>周日</span>
-                <span>周二</span>
-                <span>周四</span>
-                <span>周六</span>
-              </div>
-              {Array.from({ length: 52 }).map((_, weekIndex) => (
-                <div key={weekIndex} className="flex flex-col gap-1">
-                  {Array.from({ length: 7 }).map((_, dayIndex) => {
-                    const index = weekIndex * 7 + dayIndex
-                    const data = heatmapData[index]
-                    const intensity = data?.count || 0
-                    return (
-                      <div
-                        key={dayIndex}
-                        className={cn(
-                          'w-3 h-3 rounded-sm transition-colors hover:ring-2 hover:ring-primary cursor-pointer',
-                          intensity === 0 && 'bg-sidebar',
-                          intensity === 1 && 'bg-primary/20',
-                          intensity === 2 && 'bg-primary/40',
-                          intensity === 3 && 'bg-primary/60',
-                          intensity >= 4 && 'bg-primary/80'
-                        )}
-                        title={`${data?.date}: ${data?.count || 0} 次操作`}
-                      />
-                    )
-                  })}
+          {isLoading ? (
+            <div className="h-24 bg-sidebar rounded-lg animate-pulse" />
+          ) : (
+            <div className="overflow-x-auto pb-4">
+              <div className="flex gap-1 min-w-[800px]">
+                {/* Weekday labels */}
+                <div className="flex flex-col gap-[2px] pr-2 text-[10px] text-text-muted justify-around">
+                  <span className="h-3 flex items-center">周日</span>
+                  <span className="h-3 flex items-center">周二</span>
+                  <span className="h-3 flex items-center">周四</span>
+                  <span className="h-3 flex items-center">周六</span>
                 </div>
-              ))}
+                {/* Heatmap grid with month labels */}
+                <div className="flex flex-col">
+                  {/* Month labels row */}
+                  <div className="flex gap-[2px] mb-1 text-[10px] text-text-muted font-medium">
+                    {(() => {
+                      const yearStart = startOfYear(new Date(selectedYear, 0, 1))
+                      const yearEnd = endOfYear(new Date(selectedYear, 0, 1))
+                      const daysInYear = eachDayOfInterval({ start: yearStart, end: yearEnd })
+                      const firstDayOfWeek = yearStart.getDay()
+                      const totalWeeks = Math.ceil((daysInYear.length + firstDayOfWeek) / 7)
+                      const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+
+                      // Create array of month labels for each week
+                      const weekLabels: (string | null)[] = new Array(totalWeeks).fill(null)
+                      let currentMonth = -1
+
+                      daysInYear.forEach((day, index) => {
+                        const dayIndex = index + firstDayOfWeek
+                        const weekIndex = Math.floor(dayIndex / 7)
+                        const month = day.getMonth()
+
+                        if (month !== currentMonth) {
+                          currentMonth = month
+                          weekLabels[weekIndex] = monthNames[month]
+                        }
+                      })
+
+                      return weekLabels.map((label, i) => (
+                        <span key={i} className="w-3 flex items-center">
+                          {label}
+                        </span>
+                      ))
+                    })()}
+                  </div>
+
+                  {/* Heatmap cells */}
+                  <div className="flex gap-[2px]">
+                    {(() => {
+                      const yearStart = startOfYear(new Date(selectedYear, 0, 1))
+                      const yearEnd = endOfYear(new Date(selectedYear, 0, 1))
+                      const daysInYear = eachDayOfInterval({ start: yearStart, end: yearEnd })
+
+                      // Create a map for quick lookup
+                      const countMap: Record<string, number> = {}
+                      heatmapData.forEach(d => {
+                        countMap[d.date] = d.count
+                      })
+
+                      // Group days by week (starting from Sunday)
+                      const weeks: Date[][] = []
+                      let currentWeek: Date[] = []
+
+                      // Pad the first week with null if year doesn't start on Sunday
+                      const firstDayOfWeek = yearStart.getDay()
+                      for (let i = 0; i < firstDayOfWeek; i++) {
+                        currentWeek.push(new Date(0)) // placeholder
+                      }
+
+                      daysInYear.forEach((day) => {
+                        currentWeek.push(day)
+                        if (day.getDay() === 6) {
+                          weeks.push(currentWeek)
+                          currentWeek = []
+                        }
+                      })
+
+                      // Push the last week if not empty
+                      if (currentWeek.length > 0) {
+                        weeks.push(currentWeek)
+                      }
+
+                      return weeks.map((week, weekIndex) => (
+                        <div key={weekIndex} className="flex flex-col gap-[2px]">
+                          {week.map((day, dayIndex) => {
+                            if (day.getTime() === 0) {
+                              // Empty cell for padding
+                              return <div key={dayIndex} className="w-3 h-3" />
+                            }
+                            const dateStr = format(day, 'yyyy-MM-dd')
+                            const count = countMap[dateStr] || 0
+                            const dayName = `${day.getFullYear()}年${day.getMonth() + 1}月${day.getDate()}日`
+                            // Calculate intensity: each article adds one level of darkness
+                            const getIntensityClass = (c: number) => {
+                              if (c === 0) return 'bg-sidebar'
+                              if (c === 1) return 'bg-primary/20'
+                              if (c === 2) return 'bg-primary/30'
+                              if (c === 3) return 'bg-primary/40'
+                              if (c === 4) return 'bg-primary/50'
+                              if (c === 5) return 'bg-primary/60'
+                              if (c === 6) return 'bg-primary/70'
+                              if (c === 7) return 'bg-primary/80'
+                              if (c === 8) return 'bg-primary/90'
+                              return 'bg-primary'
+                            }
+                            return (
+                              <div
+                                key={dayIndex}
+                                className={cn(
+                                  'w-3 h-3 rounded-sm transition-colors hover:ring-2 hover:ring-primary cursor-pointer',
+                                  getIntensityClass(count)
+                                )}
+                                title={`${dayName}：${count} 篇文章`}
+                              />
+                            )
+                          })}
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Timeline Section */}
@@ -145,40 +279,46 @@ export default function Archive() {
           </div>
 
           <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-            {timelineData.map((item) => (
-              <div
-                key={item.id}
-                className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group"
-              >
-                {/* Icon */}
-                <div className="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card shadow-sm shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-all group-hover:border-primary group-hover:scale-110">
-                  <item.icon size={18} className={item.color} />
-                </div>
-                {/* Content */}
-                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-border bg-card shadow-sm group-hover:shadow-md transition-all">
-                  <div className="flex items-center justify-between mb-1">
-                    <time className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      {item.date}
-                    </time>
-                    <span
-                      className={cn(
-                        'text-[10px] font-bold px-2 py-0.5 rounded-full bg-sidebar-active/20 dark:bg-sidebar-active/10',
-                        item.color
-                      )}
-                    >
-                      {item.type === 'publish'
-                        ? '发布'
-                        : item.type === 'edit'
-                          ? '编辑'
-                          : '删除'}
-                    </span>
+            {isLoading ? (
+              <div className="text-center py-8 text-text-muted">加载中...</div>
+            ) : timelineData.length === 0 ? (
+              <div className="text-center py-8 text-text-muted">暂无动态</div>
+            ) : (
+              timelineData.map((item) => {
+                const Icon = getActivityIcon(item.action)
+                const color = getActivityColor(item.action)
+                return (
+                  <div
+                    key={item.id}
+                    className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group"
+                  >
+                    {/* Icon */}
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card shadow-sm shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-all group-hover:border-primary group-hover:scale-110">
+                      <Icon size={18} className={color} />
+                    </div>
+                    {/* Content */}
+                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-border bg-card shadow-sm group-hover:shadow-md transition-all">
+                      <div className="flex items-center justify-between mb-1">
+                        <time className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                          {format(new Date(item.createdAt), 'yyyy-MM-dd HH:mm')}
+                        </time>
+                        <span
+                          className={cn(
+                            'text-[10px] font-bold px-2 py-0.5 rounded-full bg-sidebar-active/20 dark:bg-sidebar-active/10',
+                            color
+                          )}
+                        >
+                          {getActivityLabel(item.action)}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-text-main group-hover:text-primary transition-colors line-clamp-1">
+                        {item.target || '未知'}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm font-bold text-text-main group-hover:text-primary transition-colors line-clamp-1">
-                    {item.title}
-                  </div>
-                </div>
-              </div>
-            ))}
+                )
+              })
+            )}
           </div>
         </div>
       </div>

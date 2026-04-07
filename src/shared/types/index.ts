@@ -51,6 +51,7 @@ export interface PostWithRelations {
   viewCount: number
   likeCount: number
   commentCount: number
+  isPinned?: boolean
   publishedAt?: Date | null
   category?: {
     id: string
