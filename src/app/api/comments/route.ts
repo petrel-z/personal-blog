@@ -65,9 +65,9 @@ export async function POST(request: Request) {
 
     const captchaResult = await captchaResponse.json()
 
-    if (!captchaResult.success) {
+    if (captchaResult.code !== 2000) {
       return NextResponse.json(
-        errors.unauthorized('验证码错误或已过期')
+        errors.unauthorized(captchaResult.message || '验证码错误或已过期')
       )
     }
 

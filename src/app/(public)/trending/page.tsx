@@ -17,10 +17,10 @@ export default function TrendingPage() {
   const fetchTrendingPosts = async () => {
     try {
       setIsLoading(true)
-      const result = await api.get('/stats', { type: 'popular', timeframe: 'all' }) as unknown as { code: number; data: { items: PostWithRelations[] }; message: string }
+      const result = await api.get('/stats', { type: 'popular', timeframe: 'all' }) as unknown as { code: number; data: PostWithRelations[]; message: string }
 
       if (result.code === 2000 && result.data) {
-        setPosts(result.data.items || [])
+        setPosts(Array.isArray(result.data) ? result.data : [])
       }
     } catch (error) {
       console.error('Failed to fetch trending posts:', error)

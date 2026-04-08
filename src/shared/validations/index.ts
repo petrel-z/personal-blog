@@ -52,7 +52,7 @@ export const createCommentSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email('邮箱格式无效'),
   password: z.string().min(1, '密码不能为空'),
-  captcha: z.string().optional(), // TODO: Temporarily optional for testing
+  captcha: z.string().length(4, '验证码为4位'),
 })
 
 export type LoginInput = z.infer<typeof loginSchema>

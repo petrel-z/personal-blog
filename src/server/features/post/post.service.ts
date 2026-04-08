@@ -47,6 +47,7 @@ export async function getPosts(params: PostListParams) {
       orderBy: [
         { isPinned: 'desc' },
         { publishedAt: 'desc' },
+        { createdAt: 'desc' },
       ],
     }),
     prisma.post.count({ where }),

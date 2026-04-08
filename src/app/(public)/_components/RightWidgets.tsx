@@ -38,19 +38,19 @@ export function RightWidgets() {
     try {
       // Fetch hot posts, stats, and tags in parallel
       const [postsResult, statsResult, tagsResult] = await Promise.all([
-        api.get('/stats', { type: 'popular', timeframe: 'week' }) as unknown as { code: number; data: { items: PostWithRelations[] }; message: string },
+        api.get('/stats', { type: 'popular', timeframe: 'week' }) as unknown as { code: number; data: PostWithRelations[]; message: string },
         api.get('/stats') as unknown as { code: number; data: OverviewStats; message: string },
-        api.get('/tags') as unknown as { code: number; data: { items: TagItem[] }; message: string },
+        api.get('/tags') as unknown as { code: number; data: TagItem[]; message: string },
       ])
 
       if (postsResult.code === 2000) {
-        setHotPosts(postsResult.data?.items?.slice(0, 3) || [])
+        setHotPosts(Array.isArray(postsResult.data) ? postsResult.data.slice(0, 3) : [])
       }
       if (statsResult.code === 2000) {
         setStats(statsResult.data)
       }
       if (tagsResult.code === 2000) {
-        setTags(tagsResult.data?.items || [])
+        setTags(Array.isArray(tagsResult.data) ? tagsResult.data : [])
       }
     } catch (error) {
       console.error('Failed to fetch widget data:', error)

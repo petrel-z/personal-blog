@@ -59,26 +59,48 @@ export async function POST(request: Request) {
     const validated = createPostSchema.safeParse(body)
 
     if (!validated.success) {
+      const fieldErrors = validated.error.flatten().fieldErrors
+      const firstError = fieldErrors.title?.[0] || fieldErrors.content?.[0] || '数据验证失败'
       return NextResponse.json(
-        errors.validationError(validated.error.flatten().fieldErrors?.title?.[0] || '数据验证失败')
+        errors.validationError(firstError)
       )
     }
 
-    const authorId = session?.user?.id || 'anonymous'
+    // Check authentication
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        errors.unauthorized('请先登录')
+      )
+    }
+
+    const authorId = session.user.id
     const post = await createPost(validated.data, authorId)
 
     // Create audit log
-    if (session?.user?.id) {
-      await logAdminActionWithRequest(session.user.id, {
-        action: AuditAction.POST_CREATE,
-        target: post.title,
-        details: `创建文章: ${post.title}`,
-      }, request)
-    }
+    await logAdminActionWithRequest(session.user.id, {
+      action: AuditAction.POST_CREATE,
+      target: post.title,
+      details: `创建文章: ${post.title}`,
+    }, request)
 
     return NextResponse.json(created(post), { status: 201 })
   } catch (error) {
     console.error('Failed to create post:', error)
-    return NextResponse.json(errors.serverError('创建文章失败'))
+
+    // 处理 Prisma 唯一约束错误
+    if (error instanceof Error && error.message.includes('Unique constraint')) {
+      return NextResponse.json(
+        errors.conflict('已存在相同标题的文章，请修改标题后重试')
+      )
+    }
+
+    // 处理 Prisma 验证错误
+    if (error instanceof Error && error.message.includes('Prisma')) {
+      return NextResponse.json(
+        errors.validationError('文章数据验证失败，请检查输入内容')
+      )
+    }
+
+    return NextResponse.json(errors.serverError('创建文章失败，请稍后重试'))
   }
 }

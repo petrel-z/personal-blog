@@ -94,6 +94,20 @@ export default function PostEditPage() {
     setError(null)
 
     try {
+      // 简单的表单验证
+      if (!formData.title.trim()) {
+        setSaveStatus('error')
+        setError('请输入文章标题')
+        setIsSaving(false)
+        return
+      }
+      if (!formData.content.trim()) {
+        setSaveStatus('error')
+        setError('请输入文章内容')
+        setIsSaving(false)
+        return
+      }
+
       const data = {
         ...formData,
         status: publishImmediately ? 'PUBLISHED' : formData.status,
@@ -119,11 +133,24 @@ export default function PostEditPage() {
         }
       } else {
         setSaveStatus('error')
-        setError(result.message || '保存失败')
+        // 根据错误码提供友好提示
+        let friendlyMessage = result.message || '保存失败，请稍后重试'
+
+        if (result.code === 4010) {
+          friendlyMessage = '登录已过期，请重新登录'
+        } else if (result.code === 4090) {
+          friendlyMessage = result.message || '已存在相同标题的文章，请修改标题后重试'
+        } else if (result.code === 4220) {
+          friendlyMessage = result.message || '文章内容验证失败，请检查输入'
+        } else if (result.code === 5000) {
+          friendlyMessage = '服务器错误，请稍后重试'
+        }
+
+        setError(friendlyMessage)
       }
     } catch {
       setSaveStatus('error')
-      setError('保存失败')
+      setError('网络错误，请检查网络连接后重试')
     } finally {
       setIsSaving(false)
     }

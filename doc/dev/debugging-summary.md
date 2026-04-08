@@ -572,3 +572,27 @@ href={`/post/${article.id}`}
 ## 31. API 缺少缓存策略
 
 **修复**：stats/categories/tags API 添加 Cache-Control headers
+
+---
+
+## 32. 文章目录导航跳转失败
+
+**问题**：点击目录标题无法跳转到对应章节
+
+**原因**：`parseTOC` 自定义的 slugify 函数在处理中文标题时生成不合法或重复的 ID（如空字符串、`-1`、`-2` 后缀），与 `rehype-slug` 渲染的实际 HTML ID 不匹配，导致 `document.getElementById(id)` 找不到元素
+
+**修复**：使用 `github-slugger` 替代自定义 slugify，确保与 `rehype-slug` 生成 ID 完全一致：
+```typescript
+import Slugger from 'github-slugger'
+
+function parseTOC(content: string) {
+  const slugger = new Slugger()
+  while ((match = headingRegex.exec(content)) !== null) {
+    const id = slugger.slug(text) // 自动处理中文和重复标题
+  }
+}
+```
+
+**文件**：`src/app/(public)/post/[id]/page.tsx`
+
+

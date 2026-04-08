@@ -28,9 +28,9 @@ function SearchContent() {
 
   const fetchHotTags = async () => {
     try {
-      const result = await api.get('/tags') as unknown as { code: number; data: { items: { id: string; name: string; slug: string }[] }; message: string }
+      const result = await api.get('/tags') as unknown as { code: number; data: { id: string; name: string; slug: string }[]; message: string }
       if (result.code === 2000 && result.data) {
-        setHotTags(result.data.items?.slice(0, 10).map(t => t.name) || [])
+        setHotTags(Array.isArray(result.data) ? result.data.slice(0, 10).map(t => t.name) : [])
       }
     } catch (error) {
       console.error('Failed to fetch tags:', error)

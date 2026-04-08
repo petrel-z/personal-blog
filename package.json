@@ -26,6 +26,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.3.0",
+    "github-slugger": "^2.0.0",
     "ioredis": "^5.3.2",
     "lucide-react": "^0.344.0",
     "motion": "^12.38.0",

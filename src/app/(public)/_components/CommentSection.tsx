@@ -57,11 +57,12 @@ export function CommentSection({ postId }: CommentSectionProps) {
 
   const fetchCaptcha = async () => {
     try {
-      const response = await fetch('/api/captcha')
+      const response = await fetch('/api/captcha?' + Date.now())
       const captchaId = response.headers.get('X-Captcha-Id') || ''
       const svg = await response.text()
       setCaptchaId(captchaId)
-      setCaptchaImage(`data:image/svg+xml;base64,${btoa(svg)}`)
+      // 使用 encodeURIComponent 处理 SVG，避免 btoa 中文问题
+      setCaptchaImage(`data:image/svg+xml;utf-8,${encodeURIComponent(svg)}`)
     } catch (error) {
       console.error('Failed to fetch captcha:', error)
     }

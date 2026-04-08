@@ -60,43 +60,53 @@ export function CaptchaInput({ value, onChange, error }: CaptchaInputProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         <input
           ref={inputRef}
           type="text"
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="请输入验证码"
+          placeholder="验证码"
           maxLength={4}
           className={clsx(
-            'flex-1 px-3 py-2 border rounded-lg bg-background',
+            'flex-1 px-2 py-2 border rounded-lg bg-background',
             'focus:outline-none focus:ring-2 focus:ring-primary/50',
-            'uppercase tracking-widest text-center font-mono text-lg',
+            'uppercase tracking-widest text-center font-mono text-sm',
             'placeholder:normal-case placeholder:tracking-normal placeholder:text-base',
             error && 'border-red-500 focus:ring-red-500/50'
           )}
           autoComplete="off"
         />
+        {/* Captcha Image */}
+        {captchaUrl && (
+          <img
+            src={captchaUrl}
+            alt="验证码"
+            className="h-9 w-28 rounded border border-border cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover"
+            onClick={handleClick}
+            title="点击刷新验证码"
+          />
+        )}
         <button
           type="button"
           onClick={handleClick}
           disabled={isLoading}
           className={clsx(
-            'px-4 py-2 border rounded-lg bg-sidebar',
+            'p-2 border rounded-lg bg-sidebar',
             'hover:bg-sidebar-active transition-colors',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            'flex items-center justify-center'
+            'flex items-center justify-center flex-shrink-0'
           )}
           aria-label="刷新验证码"
         >
           {isLoading ? (
-            <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           ) : (
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
+              width="16"
+              height="16"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
