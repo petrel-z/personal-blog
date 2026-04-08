@@ -38,6 +38,38 @@ import { formatDate } from "@/shared/utils";
 
 // 移除 GitHub 风格的 slugify 函数，因为我们将使用 github-slugger
 
+// 代码块组件 - 带复制功能
+function CodeBlock({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+  const [isCopied, setIsCopied] = useState(false);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  const handleCopy = async () => {
+    const code = preRef.current?.textContent || "";
+    await navigator.clipboard.writeText(code);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group">
+      <pre
+        ref={preRef}
+        {...props}
+        className="not-prose bg-card border rounded-lg p-4 overflow-x-auto text-sm"
+      >
+        {children}
+      </pre>
+      <button
+        onClick={handleCopy}
+        className="absolute top-2 right-2 p-2 rounded-md bg-sidebar-active/50 hover:bg-sidebar-active text-text-muted hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+        title="复制代码"
+      >
+        {isCopied ? <Check size={14} /> : <Copy size={14} />}
+      </button>
+    </div>
+  );
+}
+
 // 解析 Markdown 内容提取目录（处理重复 id）
 function parseTOC(
   content: string,
@@ -69,7 +101,7 @@ export default function ArticleDetail() {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
-  const [isTOCVisible, setIsTOCVisible] = useState(false); // 默认隐藏
+  const [isTOCVisible, setIsTOCVisible] = useState(true); // 默认显示目录
   const [isCategoryListVisible, setIsCategoryListVisible] = useState(true);
   const [isPageLoading, setIsPageLoading] = useState(true); // 页面初始加载
   const [isArticleLoading, setIsArticleLoading] = useState(false); // 文章切换加载
@@ -93,7 +125,6 @@ export default function ArticleDetail() {
   const scrollToHeading = (id: string) => {
     const container = contentScrollRef.current;
     if (!container) {
-      console.warn("Scroll container not found."); // 添加日志
       return;
     }
 
@@ -231,7 +262,7 @@ export default function ArticleDetail() {
     setCategoryArticles([]);
     setLikeCount(0);
     setIsPageLoading(true);
-    setIsTOCVisible(false); // 默认隐藏目录
+    setIsTOCVisible(true); // 默认显示目录
 
     // 延迟一点执行，让状态先重置
     const timer = setTimeout(() => {
@@ -323,13 +354,13 @@ export default function ArticleDetail() {
         {/* Left Column: Category Articles (1/4 width) */}
         <div
           className={cn(
-            "hidden lg:flex flex-col border-r border-border bg-background transition-all duration-300 ease-in-out flex-shrink-0 relative",
-            isCategoryListVisible ? "lg:w-1/5" : "lg:w-0",
+            "hidden max-w-[230px] lg:flex flex-col border-r border-border bg-background transition-all duration-300 ease-in-out flex-shrink-0 relative",
+            isCategoryListVisible ? "w-full" : "lg:w-0",
             !isCategoryListVisible && "border-none",
           )}
         >
           {isCategoryListVisible && (
-            <div className="w-full max-w-[280px] flex flex-col h-full overflow-hidden">
+            <div className="w-full max-w-[230px] flex flex-col h-full overflow-hidden">
               <div className="p-4 h-14 border-b border-border flex items-center justify-between flex-shrink-0">
                 <h3 className="text-xs font-bold text-text-muted flex items-center gap-2 truncate">
                   <List size={14} />
@@ -459,9 +490,11 @@ export default function ArticleDetail() {
                   rehypePlugins={[
                     rehypeSanitize,
                     rehypeSlug,
-                    rehypeRaw,
-                    rehypeHighlight,
+                    [rehypeHighlight, { detect: true, aliases: { vue: 'html', jsx: 'javascript', tsx: 'typescript' } }],
                   ]}
+                  components={{
+                    pre: CodeBlock,
+                  }}
                 >
                   {article.content}
                 </ReactMarkdown>
@@ -566,8 +599,8 @@ export default function ArticleDetail() {
             <CommentSection postId={article.id} />
 
             {/* Footer inside scrollable area */}
-            <footer className="mt-20 py-6 border-t border-border">
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[10px] text-text-muted">
+            <footer className="mt-10 pt-3 border-t border-border">
+              <div className="flex flex-wrap items-center justify-center gap-x-6  text-[10px] text-text-muted">
                 <p>© 2026 Petrel-Z. Powered by AI Studio.</p>
                 <div className="flex items-center gap-4">
                   <a
@@ -603,8 +636,8 @@ export default function ArticleDetail() {
         {/* Right Column: TOC (1/4 width) */}
         <div
           className={cn(
-            "hidden lg:flex flex-col border-l border-border bg-background transition-all duration-300 ease-in-out flex-shrink-0 h-full relative",
-            isTOCVisible ? "lg:w-1/5" : "lg:w-0",
+            "hidden max-w-[280px] lg:flex flex-col border-l border-border bg-background transition-all duration-300 ease-in-out flex-shrink-0 h-full relative",
+            isTOCVisible ? "w-full" : "lg:w-0",
             !isTOCVisible && "border-none",
           )}
         >

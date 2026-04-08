@@ -93,12 +93,21 @@ export async function getPostBySlug(slug: string) {
 }
 
 export async function createPost(data: CreatePostInput, authorId: string) {
-  const slug = data.title
+  // Generate slug from title
+  let baseSlug = data.title
     .toLowerCase()
     .trim()
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '')
+
+  // Check if slug already exists and append random suffix if needed
+  let slug = baseSlug
+  let counter = 1
+  while (await prisma.post.findUnique({ where: { slug } })) {
+    slug = `${baseSlug}-${counter}`
+    counter++
+  }
 
   const post = await prisma.post.create({
     data: {
@@ -172,11 +181,6 @@ export async function deletePost(id: string) {
 }
 
 export async function getAdjacentPosts(categoryId: string | null, currentId: string, currentSortValue: Date | null) {
-  // Build category filter - need to use proper Prisma syntax for null matching
-  const categoryFilter = categoryId
-    ? { categoryId }
-    : { categoryId: { is: null } }
-
   // Determine sort field and value: prefer publishedAt, fallback to createdAt
   const sortField = currentSortValue ? 'publishedAt' : 'createdAt'
 
@@ -193,12 +197,14 @@ export async function getAdjacentPosts(categoryId: string | null, currentId: str
   // Get previous post (按列表顺序的前一篇文章)
   const prevPost = await prisma.post.findFirst({
     where: {
-      ...categoryFilter,
       status: 'PUBLISHED',
       deletedAt: null,
       id: { not: currentId },
-      [sortField]: { gt: sortValue },
-    },
+      ...(categoryId
+        ? { categoryId, [sortField]: { gt: sortValue } }
+        : { categoryId: { is: Prisma.DbNull }, [sortField]: { gt: sortValue } }
+      ),
+    } as Prisma.PostWhereInput,
     orderBy: { [sortField]: 'asc' },
     select: {
       id: true,
@@ -211,12 +217,14 @@ export async function getAdjacentPosts(categoryId: string | null, currentId: str
   // Get next post (按列表顺序的后一篇文章)
   const nextPost = await prisma.post.findFirst({
     where: {
-      ...categoryFilter,
       status: 'PUBLISHED',
       deletedAt: null,
       id: { not: currentId },
-      [sortField]: { lt: sortValue },
-    },
+      ...(categoryId
+        ? { categoryId, [sortField]: { lt: sortValue } }
+        : { categoryId: { is: Prisma.DbNull }, [sortField]: { lt: sortValue } }
+      ),
+    } as Prisma.PostWhereInput,
     orderBy: { [sortField]: 'desc' },
     select: {
       id: true,

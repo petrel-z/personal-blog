@@ -1,15 +1,19 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api } from '@/client/api'
 import { useAuth } from '../../../_components'
+import { useToast } from '@/components/ui/toaster'
+import { Upload, Image as ImageIcon, FileText, X, Plus, Search } from 'lucide-react'
 import type { PostWithRelations, Category, Tag } from '@/shared/types'
 
 export default function PostEditPage() {
   const params = useParams()
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const id = params.id as string
 
   const [post, setPost] = useState<Partial<PostWithRelations>>({})
@@ -17,8 +21,6 @@ export default function PostEditPage() {
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<{
     title: string
@@ -40,6 +42,11 @@ export default function PostEditPage() {
     isPinned: false,
   })
 
+  const [showTagModal, setShowTagModal] = useState(false)
+  const [tagSearch, setTagSearch] = useState('')
+  const [newTagName, setNewTagName] = useState('')
+  const [isCreatingTag, setIsCreatingTag] = useState(false)
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
     fetchData()
@@ -49,21 +56,18 @@ export default function PostEditPage() {
     try {
       setIsLoading(true)
 
-      // Fetch categories and tags in parallel
       const [categoriesResult, tagsResult] = await Promise.all([
         api.get('/categories') as unknown as { code: number; data: Category[]; message: string },
         api.get('/tags') as unknown as { code: number; data: Tag[]; message: string },
       ])
 
       if (categoriesResult.code === 2000 && categoriesResult.data) {
-        // API returns data as array directly
         setCategories(categoriesResult.data)
       }
       if (tagsResult.code === 2000 && tagsResult.data) {
         setAllTags(tagsResult.data)
       }
 
-      // Fetch post if editing
       if (id && id !== 'new') {
         const postResult = await api.get(`/posts/${id}`) as unknown as { code: number; data: PostWithRelations; message: string }
         if (postResult.code === 2000 && postResult.data) {
@@ -75,35 +79,30 @@ export default function PostEditPage() {
             summary: p.summary || '',
             coverImage: p.coverImage || '',
             categoryId: p.category?.id || '',
-            tags: p.tags?.map(t => t.name) || [],
+            tags: p.tags?.map((t) => t.name) || [],
             status: (p.status === 'DELETED' ? 'ARCHIVED' : p.status) as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
             isPinned: p.isPinned || false,
           })
         }
       }
     } catch {
-      setError('获取数据失败')
+      toast({ title: '获取数据失败', variant: 'error' })
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleSave = useCallback(async (publishImmediately = false) => {
+  const handleSave = async (publishImmediately = false) => {
     setIsSaving(true)
-    setSaveStatus('saving')
-    setError(null)
 
     try {
-      // 简单的表单验证
       if (!formData.title.trim()) {
-        setSaveStatus('error')
-        setError('请输入文章标题')
+        toast({ title: '请输入文章标题', variant: 'warning' })
         setIsSaving(false)
         return
       }
       if (!formData.content.trim()) {
-        setSaveStatus('error')
-        setError('请输入文章内容')
+        toast({ title: '请输入文章内容', variant: 'warning' })
         setIsSaving(false)
         return
       }
@@ -121,19 +120,18 @@ export default function PostEditPage() {
       }
 
       if (result.code === 2000 || result.code === 2010) {
-        setSaveStatus('saved')
+        toast({
+          title: publishImmediately ? '文章发布成功' : '文章保存成功',
+          variant: 'success',
+        })
         if (id === 'new' && result.data) {
-          // Redirect to edit page with new ID
           router.push(`/admin/posts/${(result.data as PostWithRelations).id}`)
         } else {
-          // After saving existing post, redirect to posts list after showing success
           setTimeout(() => {
             router.push('/admin/posts')
           }, 1500)
         }
       } else {
-        setSaveStatus('error')
-        // 根据错误码提供友好提示
         let friendlyMessage = result.message || '保存失败，请稍后重试'
 
         if (result.code === 4010) {
@@ -146,24 +144,96 @@ export default function PostEditPage() {
           friendlyMessage = '服务器错误，请稍后重试'
         }
 
-        setError(friendlyMessage)
+        toast({ title: friendlyMessage, variant: 'error' })
       }
     } catch {
-      setSaveStatus('error')
-      setError('网络错误，请检查网络连接后重试')
+      toast({ title: '网络错误，请检查网络连接后重试', variant: 'error' })
     } finally {
       setIsSaving(false)
     }
-  }, [formData, id, router])
+  }
 
-  const handleTagToggle = (tagName: string) => {
-    setFormData(prev => ({
+  const toggleTag = (tagName: string) => {
+    setFormData((prev) => ({
       ...prev,
       tags: prev.tags.includes(tagName)
-        ? prev.tags.filter(t => t !== tagName)
+        ? prev.tags.filter((t) => t !== tagName)
         : [...prev.tags, tagName],
     }))
   }
+
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return
+
+    setIsCreatingTag(true)
+    try {
+      const result = await api.post('/tags', {
+        name: newTagName.trim(),
+        slug: newTagName.trim().toLowerCase().replace(/\s+/g, '-'),
+      })
+      if (result.code === 2000 || result.code === 2010) {
+        // Refresh tags list
+        const tagsResult = await api.get('/tags') as unknown as { code: number; data: Tag[]; message: string }
+        if (tagsResult.code === 2000 && tagsResult.data) {
+          setAllTags(tagsResult.data)
+        }
+        // Add to selected
+        setFormData((prev) => ({ ...prev, tags: [...prev.tags, newTagName.trim()] }))
+        setNewTagName('')
+        toast({ title: '标签创建成功', variant: 'success' })
+      }
+    } catch {
+      toast({ title: '创建标签失败', variant: 'error' })
+    } finally {
+      setIsCreatingTag(false)
+    }
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const uploadData = new FormData()
+    uploadData.append('file', file)
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData,
+      })
+      const result = await res.json()
+      if (result.code === 2000) {
+        setFormData((prev) => ({ ...prev, coverImage: result.data.url }))
+        toast({ title: '封面上传成功', variant: 'success' })
+      } else {
+        toast({ title: result.message || '封面上传失败', variant: 'error' })
+      }
+    } catch {
+      toast({ title: '封面上传失败，请检查网络连接', variant: 'error' })
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      const input = fileInputRef.current
+      if (input) {
+        const dataTransfer = new DataTransfer()
+        dataTransfer.items.add(file)
+        input.files = dataTransfer.files
+        input.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+    }
+  }
+
+  const filteredTags = useMemo(() => {
+    return allTags.filter(
+      (tag) =>
+        tag.name.toLowerCase().includes(tagSearch.toLowerCase()) &&
+        !formData.tags.includes(tag.name)
+    )
+  }, [allTags, tagSearch, formData.tags])
 
   if (authLoading || isLoading) {
     return (
@@ -174,212 +244,319 @@ export default function PostEditPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {id === 'new' ? '写文章' : '编辑文章'}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {id === 'new' ? '创建新文章' : `编辑: ${post.title}`}
-          </p>
+    <div className="min-h-full bg-background">
+      {/* Tag Selection Modal */}
+      {showTagModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setShowTagModal(false)} />
+          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="font-medium">选择标签</h3>
+              <button
+                onClick={() => setShowTagModal(false)}
+                className="p-1 hover:bg-accent rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={tagSearch}
+                  onChange={(e) => setTagSearch(e.target.value)}
+                  placeholder="搜索标签..."
+                  className="w-full pl-10 pr-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                />
+              </div>
+
+              {/* Existing Tags */}
+              <div className="max-h-60 overflow-y-auto space-y-1">
+                {filteredTags.length > 0 ? (
+                  filteredTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => toggleTag(tag.name)}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-accent rounded-md flex items-center justify-between"
+                    >
+                      <span>{tag.name}</span>
+                      {formData.tags.includes(tag.name) && (
+                        <span className="text-primary">✓</span>
+                      )}
+                    </button>
+                  ))
+                ) : tagSearch ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    没有找到匹配的标签
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    暂无标签
+                  </p>
+                )}
+              </div>
+
+              {/* Create New Tag */}
+              <div className="border-t pt-4">
+                <label className="block text-sm font-medium mb-2">创建新标签</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    placeholder="输入新标签名称"
+                    className="flex-1 px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
+                  />
+                  <button
+                    onClick={handleCreateTag}
+                    disabled={!newTagName.trim() || isCreatingTag}
+                    className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    创建
+                  </button>
+                </div>
+              </div>
+
+              {/* Selected Tags Summary */}
+              {formData.tags.length > 0 && (
+                <div className="border-t pt-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    已选择 {formData.tags.length} 个标签
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* Save Status */}
-        <div className="flex items-center gap-4">
-          {saveStatus === 'saving' && (
-            <span className="text-sm text-muted-foreground">保存中...</span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="text-sm text-green-600">已保存</span>
-          )}
-          {saveStatus === 'error' && (
-            <span className="text-sm text-red-600">保存失败</span>
-          )}
-
+      {/* Header */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-6 py-4 lg:left-64">
+        <div className="flex items-center justify-end gap-3">
           <button
             onClick={() => handleSave(false)}
             disabled={isSaving}
-            className="px-4 py-2 border rounded-lg hover:bg-accent disabled:opacity-50"
+            className="px-4 py-2 text-sm border rounded-lg hover:bg-accent disabled:opacity-50 transition-colors"
           >
             保存草稿
           </button>
           <button
             onClick={() => handleSave(true)}
             disabled={isSaving}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            {formData.status === 'PUBLISHED' ? '更新发布' : '发布'}
+            {isSaving ? '发布中...' : formData.status === 'PUBLISHED' ? '更新发布' : '发布'}
           </button>
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Main Editor */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Editor Area */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="p-6 pb-24 space-y-6">
+        {/* Main Editor Area */}
+        <div className="space-y-4">
           {/* Title */}
           <input
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="文章标题"
-            className="w-full text-2xl font-bold border-0 border-b bg-transparent pb-2 focus:outline-none focus:border-primary"
+            placeholder="请输入文章标题"
+            className="w-full text-3xl font-bold border-0 bg-transparent pb-4 focus:outline-none placeholder:text-muted-foreground/50"
           />
 
-          {/* Content */}
-          <textarea
-            value={formData.content}
-            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-            placeholder="开始写作..."
-            className="w-full h-96 p-4 border rounded-lg resize-none font-mono text-sm"
-          />
-
-          {/* Summary */}
-          <div>
-            <label className="block text-sm font-medium mb-1">摘要</label>
+          {/* Content - Auto expanding */}
+          <div className="relative">
             <textarea
-              value={formData.summary}
-              onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
-              placeholder="文章摘要（可选）"
-              className="w-full p-3 border rounded-lg resize-none"
-              rows={3}
+              value={formData.content}
+              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+              placeholder="请输入文章内容..."
+              className="w-full min-h-[500px] p-4 border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+              style={{ height: 'auto', minHeight: '500px' }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement
+                target.style.height = 'auto'
+                target.style.height = Math.max(500, target.scrollHeight) + 'px'
+              }}
             />
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {/* Publish Settings */}
-          <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="font-medium">发布设置</h3>
-
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="isPinned"
-                checked={formData.isPinned}
-                onChange={(e) => setFormData({ ...formData, isPinned: e.target.checked })}
-                className="rounded"
+        {/* Article Settings Card */}
+        <div className="border rounded-lg bg-card">
+          <div className="px-4 py-3 border-b flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            <h3 className="font-medium text-sm">文章设置</h3>
+          </div>
+          <div className="p-4 space-y-4">
+            {/* Summary */}
+            <div>
+              <label className="block text-sm font-medium mb-2">摘要</label>
+              <textarea
+                value={formData.summary}
+                onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+                placeholder="文章摘要（可选）"
+                className="w-full p-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                rows={3}
               />
-              <label htmlFor="isPinned" className="text-sm">置顶文章</label>
             </div>
 
+            {/* Category */}
             <div>
-              <label className="block text-sm font-medium mb-1">状态</label>
+              <label className="block text-sm font-medium mb-2">分类</label>
+              <select
+                value={formData.categoryId}
+                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+              >
+                <option value="">未分类</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-sm font-medium mb-2">标签</label>
+
+              {/* Selected Tags */}
+              {formData.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {formData.tags.map((tagName) => (
+                    <span
+                      key={tagName}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full"
+                    >
+                      {tagName}
+                      <button
+                        type="button"
+                        onClick={() => toggleTag(tagName)}
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Add Tag Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTagModal(true)
+                  setTagSearch('')
+                  setNewTagName('')
+                }}
+                className="w-full px-3 py-2 text-sm border border-dashed rounded-md hover:border-primary/50 hover:bg-accent/50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                添加文章标签
+              </button>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium mb-2">状态</label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                className="w-full px-3 py-2 border rounded-lg"
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' })
+                }
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
               >
                 <option value="DRAFT">草稿</option>
                 <option value="PUBLISHED">已发布</option>
                 <option value="ARCHIVED">归档</option>
               </select>
             </div>
-          </div>
 
-          {/* Category */}
-          <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="font-medium">分类</h3>
-            <select
-              value={formData.categoryId}
-              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="">未分类</option>
-              {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tags */}
-          <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="font-medium">标签</h3>
-            <div className="flex flex-wrap gap-2">
-              {allTags.map(tag => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => handleTagToggle(tag.name)}
-                  className={`px-2 py-1 text-sm rounded-full transition-colors ${
-                    formData.tags.includes(tag.name)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-sidebar hover:bg-sidebar-active'
-                  }`}
-                >
-                  {tag.name}
-                </button>
-              ))}
-            </div>
-            {formData.tags.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                已选择: {formData.tags.join(', ')}
-              </p>
-            )}
-          </div>
-
-          {/* Cover Image */}
-          <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="font-medium">封面图片</h3>
-            <div className="flex gap-2">
+            {/* Publish Settings */}
+            <div className="flex items-center gap-2 pt-2 border-t">
               <input
-                type="url"
-                value={formData.coverImage}
-                onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
-                placeholder="图片 URL"
-                className="flex-1 px-3 py-2 border rounded-lg"
+                type="checkbox"
+                id="isPinned"
+                checked={formData.isPinned}
+                onChange={(e) =>
+                  setFormData({ ...formData, isPinned: e.target.checked })
+                }
+                className="rounded"
               />
-              <label className="px-4 py-2 bg-sidebar hover:bg-sidebar-active text-sm rounded-lg cursor-pointer transition-colors">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-
-                    const uploadFormData = new FormData()
-                    uploadFormData.append('file', file)
-
-                    try {
-                      const res = await fetch('/api/upload', {
-                        method: 'POST',
-                        body: uploadFormData,
-                      })
-                      const result = await res.json()
-                      if (result.code === 2000) {
-                        setFormData((prev) => ({ ...prev, coverImage: result.data.url }))
-                      } else {
-                        alert(result.message || '上传失败')
-                      }
-                    } catch {
-                      alert('上传失败')
-                    }
-                  }}
-                />
-                上传
+              <label htmlFor="isPinned" className="text-sm cursor-pointer">
+                置顶文章
               </label>
             </div>
-            {formData.coverImage && (
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-sidebar">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={formData.coverImage}
-                  alt="Cover"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
+          </div>
+        </div>
+
+        {/* Cover Image Card */}
+        <div className="border rounded-lg bg-card">
+          <div className="px-4 py-3 border-b flex items-center gap-2">
+            <ImageIcon className="w-4 h-4" />
+            <h3 className="font-medium text-sm">封面图片</h3>
+          </div>
+          <div className="p-4">
+            {/* Upload/Preview Area */}
+            <div
+              className="relative border-2 border-dashed border-muted-foreground/30 rounded-lg hover:border-primary/50 transition-colors cursor-pointer overflow-hidden group w-64 aspect-video"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+
+              {formData.coverImage ? (
+                <div className="relative w-full h-full">
+                  <img
+                    src={formData.coverImage}
+                    alt="封面预览"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        fileInputRef.current?.click()
+                      }}
+                      className="px-4 py-2 bg-white text-black text-sm rounded-full"
+                    >
+                      更换图片
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setFormData((prev) => ({ ...prev, coverImage: '' }))
+                      }}
+                      className="px-4 py-2 bg-red-500 text-white text-sm rounded-full"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center w-full h-full">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                    <Upload className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    点击上传，或拖拽图片到这里
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    支持 JPG、PNG 格式，建议 16:9 比例
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

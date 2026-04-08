@@ -125,7 +125,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
               onChange={(e) => setNickname(e.target.value)}
               placeholder="请输入昵称"
               maxLength={20}
-              className="w-full bg-sidebar-active/20 dark:bg-sidebar-active/10 border border-border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              className="w-full bg-background dark:bg-sidebar-active/10 border border-border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               required
             />
           </div>
@@ -140,7 +140,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
                 onChange={(e) => setCaptcha(e.target.value)}
                 placeholder="4位验证码"
                 maxLength={4}
-                className="flex-1 bg-sidebar-active/20 dark:bg-sidebar-active/10 border border-border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                className="flex-1 bg-background dark:bg-sidebar-active/10 border border-border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 required
               />
               {captchaImage && (
@@ -166,7 +166,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
             rows={4}
             placeholder="说点什么吧... (最多500字)"
             maxLength={500}
-            className="w-full bg-sidebar-active/20 dark:bg-sidebar-active/10 border border-border rounded-lg px-3 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
+            className="w-full bg-background dark:bg-sidebar-active/10 border border-border rounded-lg px-3 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
             required
           />
         </div>

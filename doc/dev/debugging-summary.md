@@ -595,4 +595,241 @@ function parseTOC(content: string) {
 
 **文件**：`src/app/(public)/post/[id]/page.tsx`
 
+---
+
+## 33. useToast 组件外调用导致无限循环
+
+### 问题描述
+文章管理页面一直疯狂调用获取文章列表接口，导致页面卡死。
+
+### 原因分析
+`useToast` hook 在 `ToastContext` 为 null 时（SSR 或组件在 Toaster 外被调用），每次都返回一个新对象：
+```typescript
+// 错误写法
+if (!context) {
+  return {
+    toast: () => {},
+    dismiss: () => {},
+  }
+}
+```
+
+这导致 `toast` 引用每次都变化，而 `fetchPosts` 依赖 `toast`，因此依赖数组不断变化，触发 useEffect 无限循环。
+
+### 解决方案
+使用稳定的单例对象，避免引用变化：
+```typescript
+// 模块级别创建稳定的空函数对象
+const noopToast = {
+  toast: () => {},
+  dismiss: () => {},
+}
+
+export function useToast() {
+  const context = React.useContext(ToastContext)
+  if (!context) {
+    return noopToast  // 返回稳定的单例引用
+  }
+  return context
+}
+```
+
+### 受影响文件
+- `src/components/ui/toaster.tsx`
+- `src/app/(admin)/admin/posts/page.tsx`
+- `src/app/(admin)/admin/tags/page.tsx`
+
+### 经验总结
+11. **React Hooks 依赖**: 任何在 useCallback/useEffect 中使用的值，都必须是稳定的引用
+12. **Context 空值处理**: 返回空函数时要确保引用稳定，避免导致依赖方无限重渲染
+
+---
+
+## 34. 后台布局 - 侧边栏遮挡内容
+
+**问题描述**：左侧边栏使用 `fixed` 定位，不占据文档流位置，导致右侧内容被遮挡。
+
+**原因分析**：
+- 侧边栏使用 `position: fixed`，从文档流中移除
+- 内容区域没有为固定侧边栏预留空间
+
+**解决方案**：
+- 文件：`src/app/(admin)/layout.tsx`
+- 为内容容器添加 `lg:ml-64` 偏移量
+
+```tsx
+<div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+```
+
+---
+
+## 35. 文章目录默认显示
+
+**问题描述**：文章详情页的目录默认隐藏，用户希望默认显示。
+
+**解决方案**：
+- 文件：`src/app/(public)/post/[id]/page.tsx`
+- 将 `isTOCVisible` 状态默认值从 `false` 改为 `true`
+
+```tsx
+const [isTOCVisible, setIsTOCVisible] = useState(true);
+```
+
+---
+
+## 36. 代码块复制功能
+
+**问题描述**：需要为 Markdown 代码块添加复制功能。
+
+**解决方案**：
+- 创建 `CodeBlock` 组件，包装 `<pre>` 元素
+- 添加复制按钮，悬停时显示
+- 使用 Clipboard API 实现复制
+
+```tsx
+function CodeBlock({ children, ...props }) {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = async () => {
+    const code = preRef.current?.textContent || "";
+    await navigator.clipboard.writeText(code);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group">
+      <pre ref={preRef} {...props}>{children}</pre>
+      <button onClick={handleCopy}>复制</button>
+    </div>
+  );
+}
+```
+
+---
+
+## 37. 代码块语法高亮 - Vue/JSX 不高亮
+
+**问题描述**：
+- 使用 `rehype-highlight` 时，`vue` 和 `jsx` 代码块不显示高亮
+- highlight.js 默认只支持 37 种常见语言
+
+**原因分析**：
+- highlight.js 的 common 捆绑包不包含 `vue` 语言
+- `vue` 不是独立语言，而是 HTML + CSS + JS 的组合
+
+**解决方案**：
+- 文件：`src/app/(public)/post/[id]/page.tsx`
+- 配置语言别名映射
+
+```tsx
+import rehypeHighlight from 'rehype-highlight';
+
+<ReactMarkdown
+  rehypePlugins={[
+    rehypeSanitize,
+    rehypeSlug,
+    [rehypeHighlight, {
+      detect: true,
+      aliases: {
+        vue: 'html',    // Vue 模板用 HTML 高亮
+        jsx: 'javascript',
+        tsx: 'typescript'
+      }
+    }],
+  ]}
+>
+```
+
+**highlight.js 默认支持的语言**：
+| 语言 | 支持情况 | 解决方案 |
+|------|---------|---------|
+| JavaScript/TypeScript | ✅ 原生支持 | 直接使用 |
+| Python/Java/C++/Go/Rust | ✅ 原生支持 | 直接使用 |
+| HTML/CSS | ✅ 原生支持 | 直接使用 |
+| Vue | ❌ 不支持 | 映射为 HTML |
+| JSX | ❌ 不支持 | 映射为 JavaScript |
+
+---
+
+## 38. 评论输入框主题颜色问题
+
+**问题描述**：浅色主题下，评论区的输入框显示深色背景色。
+
+**原因分析**：
+- 输入框使用了 `bg-sidebar-active/20`
+- `sidebar-active` 在浅色主题下是暖棕色调 (#e0d7c1)
+- 不适合作为输入框背景
+
+**解决方案**：
+- 文件：`src/app/(public)/_components/CommentSection.tsx`
+- 浅色主题使用 `bg-background`，深色主题使用 `dark:bg-sidebar-active/10`
+
+```tsx
+<input className="bg-background dark:bg-sidebar-active/10 ..." />
+<textarea className="bg-background dark:bg-sidebar-active/10 ..." />
+```
+
+---
+
+## 39. 后台编辑器按钮固定定位
+
+**问题描述**：后台写文章页面的保存/发布按钮需要固定在页面底部。
+
+**解决方案**：
+- 文件：`src/app/(admin)/admin/posts/new/page.tsx` 和 `[id]/page.tsx`
+- 从 `sticky` 改为 `fixed` 定位
+- 桌面端考虑侧边栏偏移
+
+```tsx
+<div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-6 py-4 lg:left-64">
+```
+
+- 同时为内容区添加底部内边距 `pb-24` 防止内容被遮挡
+
+---
+
+## 40. TypeScript 编译错误 - Prisma 类型问题
+
+**问题描述**：
+```
+Type '{ categoryId: string; } | { categoryId: { is: DbNull; }; }' is not assignable to type 'PostWhereInput'
+```
+
+**原因分析**：
+- 当 `categoryId` 为 `null` 时，使用 `categoryId: { is: Prisma.DbNull }`
+- TypeScript 无法正确推断类型，导致联合类型错误
+
+**解决方案**：
+- 文件：`src/server/features/post/post.service.ts`
+- 使用类型断言 `as Prisma.PostWhereInput`
+
+```tsx
+const prevPost = await prisma.post.findFirst({
+  where: {
+    status: 'PUBLISHED',
+    deletedAt: null,
+    id: { not: currentId },
+    ...(categoryId
+      ? { categoryId, [sortField]: { gt: sortValue } }
+      : { categoryId: { is: Prisma.DbNull }, [sortField]: { gt: sortValue } }
+    ),
+  } as Prisma.PostWhereInput,
+  ...
+});
+```
+
+---
+
+## 问题汇总表
+
+| 编号 | 问题 | 文件 | 关键词 |
+|------|------|------|--------|
+| 34 | 侧边栏布局 | `layout.tsx` | `fixed`, `ml-64` |
+| 35 | 目录默认显示 | `post/[id]/page.tsx` | `isTOCVisible` |
+| 36 | 代码块复制 | `post/[id]/page.tsx` | `CodeBlock`, `clipboard` |
+| 37 | 语法高亮 | `post/[id]/page.tsx` | `rehype-highlight`, `aliases` |
+| 38 | 评论输入框 | `CommentSection.tsx` | `bg-background` |
+| 39 | 按钮固定 | `posts/new/page.tsx` | `fixed`, `lg:left-64` |
+| 40 | Prisma 类型 | `post.service.ts` | `as Prisma.PostWhereInput` |
 
