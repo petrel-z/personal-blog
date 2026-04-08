@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
+import { useToast } from '@/components/ui/toaster'
 import type { Tag } from '@/shared/types'
 
 interface TagWithCount extends Tag {
@@ -11,9 +12,9 @@ interface TagWithCount extends Tag {
 
 export default function TagsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { toast } = useToast()
   const [tags, setTags] = useState<TagWithCount[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [showDialog, setShowDialog] = useState(false)
   const [editingTag, setEditingTag] = useState<TagWithCount | null>(null)
   const [formData, setFormData] = useState({ name: '', slug: '' })
@@ -34,7 +35,7 @@ export default function TagsPage() {
         setTags(result.data.items || [])
       }
     } catch {
-      setError('获取标签失败')
+      toast({ title: '获取标签失败', variant: 'error' })
     } finally {
       setIsLoading(false)
     }
@@ -48,18 +49,23 @@ export default function TagsPage() {
       if (editingTag) {
         const result = await api.put(`/tags/${editingTag.id}`, formData)
         if (result.code === 2000) {
+          toast({ title: '标签更新成功', variant: 'success' })
           fetchTags()
           closeDialog()
         }
       } else {
         const result = await api.post('/tags', formData)
         if (result.code === 2000) {
+          toast({ title: '标签创建成功', variant: 'success' })
           fetchTags()
           closeDialog()
         }
       }
     } catch {
-      setError(editingTag ? '更新标签失败' : '创建标签失败')
+      toast({
+        title: editingTag ? '更新标签失败' : '创建标签失败',
+        variant: 'error',
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -77,10 +83,11 @@ export default function TagsPage() {
     try {
       const result = await api.delete(`/tags/${id}`)
       if (result.code === 2000) {
+        toast({ title: '标签删除成功', variant: 'success' })
         fetchTags()
       }
     } catch {
-      setError('删除标签失败')
+      toast({ title: '删除标签失败', variant: 'error' })
     }
   }
 
@@ -124,13 +131,6 @@ export default function TagsPage() {
           新建标签
         </button>
       </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
 
       {/* Tags Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">

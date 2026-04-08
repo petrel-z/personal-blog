@@ -59,7 +59,7 @@ export function RightWidgets() {
 
   // Calculate running days (hardcoded start date)
   const runningDays = () => {
-    const startDate = new Date('2018-01-01')
+    const startDate = new Date('2025-10-23')
     const today = new Date()
     const diff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     const years = Math.floor(diff / 365)

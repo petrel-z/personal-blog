@@ -23,11 +23,11 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { label: '首页', path: '/', icon: Home },
-  { label: '作品', path: '/works', icon: LayoutGrid },
+  // { label: '作品', path: '/works', icon: LayoutGrid },
   { label: '关于', path: '/about', icon: User },
-  { label: '留言', path: '/guestbook', icon: MessageSquare },
-  { label: '订阅', path: '/rss', icon: Rss },
-  { label: '友链', path: '/links', icon: LinkIcon },
+  // { label: '留言', path: '/guestbook', icon: MessageSquare },
+  // { label: '订阅', path: '/rss', icon: Rss },
+  // { label: '友链', path: '/links', icon: LinkIcon },
   { label: '归档', path: '/archive', icon: Archive },
 ]
 

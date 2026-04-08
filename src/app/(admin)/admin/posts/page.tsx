@@ -4,13 +4,14 @@ import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
+import { useToast } from '@/components/ui/toaster'
 import type { PostWithRelations } from '@/shared/types'
 
 export default function PostsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { toast } = useToast()
   const [posts, setPosts] = useState<PostWithRelations[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
@@ -40,11 +41,11 @@ export default function PostsPage() {
         setTotalPages(result.data.totalPages || 1)
       }
     } catch {
-      setError('获取文章列表失败')
+      toast({ title: '获取文章列表失败', variant: 'error' })
     } finally {
       setIsLoading(false)
     }
-  }, [page, filter, search])
+  }, [page, filter, search, toast])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
@@ -57,10 +58,11 @@ export default function PostsPage() {
     try {
       const result = await api.delete(`/posts/${id}`)
       if (result.code === 2000) {
+        toast({ title: '文章删除成功', variant: 'success' })
         fetchPosts()
       }
     } catch {
-      setError('删除文章失败')
+      toast({ title: '删除文章失败', variant: 'error' })
     }
   }
 
@@ -109,13 +111,6 @@ export default function PostsPage() {
           写文章
         </Link>
       </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
