@@ -57,6 +57,19 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>
 
+export const registerSchema = z.object({
+  name: z.string().min(1, '用户名不能为空').max(50, '用户名不能超过50字符'),
+  email: z.string().email('邮箱格式无效'),
+  password: z.string().min(6, '密码至少6位').max(100, '密码不能超过100位'),
+  confirmPassword: z.string().min(1, '请确认密码'),
+  captcha: z.string().length(4, '验证码为4位'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: '两次密码不一致',
+  path: ['confirmPassword'],
+})
+
+export type RegisterInput = z.infer<typeof registerSchema>
+
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(50).default(10),

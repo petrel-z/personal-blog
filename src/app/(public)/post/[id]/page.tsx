@@ -110,6 +110,7 @@ export default function ArticleDetail() {
   const [categoryPage, setCategoryPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const isLoadingMoreRef = useRef(false); // 使用 ref 追踪加载状态，避免 useCallback 依赖循环
   const [sentinelRef, setSentinelRef] = useState<HTMLDivElement | null>(null);
   const isFirstLoad = useRef(true);
 
@@ -208,9 +209,10 @@ export default function ArticleDetail() {
   // 加载更多分类文章
   const loadMoreCategoryArticles = useCallback(
     async (signal: AbortSignal) => {
-      if (!article?.category?.id || isLoadingMore || !hasMore) return;
+      if (!article?.category?.id || isLoadingMoreRef.current || !hasMore) return;
 
       try {
+        isLoadingMoreRef.current = true;
         setIsLoadingMore(true);
         const nextPage = categoryPage + 1;
         const postsResult = (await api.get(
@@ -246,10 +248,11 @@ export default function ArticleDetail() {
           return;
         console.error("Failed to load more articles:", error);
       } finally {
+        isLoadingMoreRef.current = false;
         setIsLoadingMore(false);
       }
     },
-    [article?.category?.id, categoryPage, isLoadingMore, hasMore],
+    [article?.category?.id, categoryPage, hasMore],
   );
 
   // 获取文章 - id 变化时执行
@@ -283,7 +286,7 @@ export default function ArticleDetail() {
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+        if (entry.isIntersecting && hasMore && !isLoadingMoreRef.current) {
           loadMoreCategoryArticles(abortController.signal);
         }
       },
@@ -298,7 +301,6 @@ export default function ArticleDetail() {
   }, [
     sentinelRef,
     hasMore,
-    isLoadingMore,
     isCategoryListVisible,
     loadMoreCategoryArticles,
   ]);

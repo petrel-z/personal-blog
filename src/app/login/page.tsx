@@ -1,6 +1,7 @@
 'use client'
 
 import React, { Suspense } from 'react'
+import Link from 'next/link'
 import { LoginForm } from '../(admin)/_components'
 import { Loader2 } from 'lucide-react'
 
@@ -44,6 +45,13 @@ export default function LoginPage() {
 
         <p className="text-xs text-center text-muted-foreground">
           登录即表示您同意我们的服务条款
+        </p>
+
+        <p className="text-xs text-center text-muted-foreground">
+          还没有账号？{' '}
+          <Link href="/register" className="text-primary hover:underline">
+            立即注册
+          </Link>
         </p>
       </div>
     </div>

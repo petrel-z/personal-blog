@@ -833,3 +833,97 @@ const prevPost = await prisma.post.findFirst({
 | 39 | 按钮固定 | `posts/new/page.tsx` | `fixed`, `lg:left-64` |
 | 40 | Prisma 类型 | `post.service.ts` | `as Prisma.PostWhereInput` |
 
+---
+
+## 41. npm/pnpm 混用导致 node_modules 混乱
+
+**问题**：`@prisma/client` 模块找不到，错误路径指向 `.pnpm` 目录
+
+**原因**：混用 npm 和 pnpm 安装依赖，导致 node_modules 结构混乱
+
+**解决**：选择一个包管理器，彻底清理后重装
+```bash
+rm -rf node_modules .next
+rm -f package-lock.json pnpm-lock.yaml
+pnpm install
+pnpm prisma generate
+```
+
+---
+
+## 42. Prisma Client 未生成
+
+**问题**：`MODULE_NOT_FOUND @prisma/client`
+
+**原因**：修改 schema.prisma 后未重新生成 Client
+
+**解决**：
+```bash
+pnpm prisma generate
+# 或
+npx prisma generate
+```
+
+---
+
+## 43. 注册接口验证失败
+
+**问题**：注册返回 `code: 4220, message: "Required"`，提示 `confirmPassword` 和 `captcha` 为必填
+
+**原因**：前端注册页面只传了 `name/email/password`，但 API 使用完整验证 schema
+
+**解决**：API 层使用精简验证 schema（captcha 在前端已验证）
+```typescript
+const registerApiSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(6),
+})
+```
+
+**文件**：
+- `src/app/api/auth/register/route.ts`
+- `src/app/register/page.tsx`
+
+---
+
+## 44. 文章详情页无限请求接口
+
+**问题**：页面疯狂调用获取文章列表接口
+
+**原因**：`loadMoreCategoryArticles` 的 useCallback 依赖 `isLoadingMore`，而函数内部调用 `setIsLoadingMore(true/false)`，导致回调不断重建，触发 effect 重复执行
+
+**解决**：用 `ref` 替代 `state` 做判断条件，避免循环
+```typescript
+const isLoadingMoreRef = useRef(false);
+
+const loadMoreCategoryArticles = useCallback(async (signal) => {
+  if (!article?.category?.id || isLoadingMoreRef.current || !hasMore) return;
+  isLoadingMoreRef.current = true;
+  // ... fetch ...
+  isLoadingMoreRef.current = false;
+}, [article?.category?.id, categoryPage, hasMore]); // 移除 isLoadingMore
+```
+
+**文件**：`src/app/(public)/post/[id]/page.tsx`
+
+---
+
+## 45. 注册用户无角色
+
+**问题**：新注册用户没有任何角色，无法区分权限
+
+**说明**：当前注册接口只创建用户记录，未分配角色
+
+**文件**：`src/app/api/auth/register/route.ts`
+
+---
+
+## 46. 后台可查看所有用户文章
+
+**问题**：admin 页面能看到所有用户的文章，未按 authorId 过滤
+
+**说明**：当前 `getPosts` 在 admin 模式下未传 authorId 过滤条件
+
+**文件**：`src/server/features/post/post.service.ts`
+
