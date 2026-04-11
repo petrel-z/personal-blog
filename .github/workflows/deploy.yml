@@ -45,4 +45,3 @@ jobs:
             pnpm prisma generate
             pnpm build
             pm2 restart blog
-            
