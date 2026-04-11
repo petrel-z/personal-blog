@@ -17,10 +17,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
 
-      - name: Install pnpm
-        run: npm install -g pnpm
+      - name: Enable pnpm via corepack
+        run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -41,6 +40,7 @@ jobs:
           script: |
             cd /root/blog
             git pull origin main
+            corepack enable
             pnpm install --frozen-lockfile
             pnpm prisma generate
             pnpm build
