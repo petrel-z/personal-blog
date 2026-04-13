@@ -239,7 +239,10 @@ function ArticleCard({ article }: { article: PostWithRelations }) {
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-4 text-[10px] text-text-muted">
               <span>{article.author?.name || '匿名'}</span>
-              <span>{formatDate(article.publishedAt)}</span>
+              <span>发布于 {formatDate(article.publishedAt)}</span>
+              {article.createdAt && article.createdAt !== article.publishedAt && (
+                <span>创建于 {formatDate(article.createdAt)}</span>
+              )}
               <span>{article.commentCount} 评论</span>
               <span>{article.viewCount} 阅读</span>
             </div>

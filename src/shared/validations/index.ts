@@ -20,6 +20,7 @@ export const createPostSchema = z.object({
   coverImage: z.string().url('封面图链接无效').optional().or(z.literal('')),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
   isPinned: z.boolean().optional(),
+  createdAt: z.string().datetime().optional(), // 自定义创建时间
 })
 
 export const updatePostSchema = createPostSchema.partial()

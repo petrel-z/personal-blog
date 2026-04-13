@@ -23,6 +23,7 @@ const updatePostSchema = z.object({
   coverImage: z.string().url().optional().nullable().or(z.literal('')),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
   isPinned: z.boolean().optional(),
+  createdAt: z.string().datetime().optional(),
 })
 
 // GET /api/posts/[id]

@@ -120,6 +120,8 @@ export async function createPost(data: CreatePostInput, authorId: string) {
       isPinned: data.isPinned || false,
       authorId,
       categoryId: data.categoryId,
+      createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
+      publishedAt: data.createdAt && data.status === 'PUBLISHED' ? new Date(data.createdAt) : undefined,
       tags: data.tags
         ? {
             connectOrCreate: data.tags.map((name) => ({

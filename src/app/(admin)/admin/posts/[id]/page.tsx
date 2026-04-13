@@ -31,6 +31,7 @@ export default function PostEditPage() {
     tags: string[]
     status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
     isPinned: boolean
+    createdAt: string
   }>({
     title: '',
     content: '',
@@ -40,6 +41,7 @@ export default function PostEditPage() {
     tags: [],
     status: 'DRAFT',
     isPinned: false,
+    createdAt: '',
   })
 
   const [showTagModal, setShowTagModal] = useState(false)
@@ -83,6 +85,7 @@ export default function PostEditPage() {
             tags: p.tags?.map((t) => t.name) || [],
             status: (p.status === 'DELETED' ? 'ARCHIVED' : p.status) as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
             isPinned: p.isPinned || false,
+            createdAt: p.createdAt ? new Date(p.createdAt).toISOString().slice(0, 16) : '',
           })
         }
       }
@@ -111,6 +114,7 @@ export default function PostEditPage() {
       const data = {
         ...formData,
         status: publishImmediately ? 'PUBLISHED' : formData.status,
+        ...(formData.createdAt && { createdAt: new Date(formData.createdAt).toISOString() }),
       }
 
       let result
@@ -490,6 +494,22 @@ export default function PostEditPage() {
               <label htmlFor="isPinned" className="text-sm cursor-pointer">
                 置顶文章
               </label>
+            </div>
+
+            {/* Created At */}
+            <div className="border-t pt-4">
+              <label className="block text-sm font-medium mb-2">创建时间</label>
+              <input
+                type="datetime-local"
+                value={formData.createdAt}
+                onChange={(e) =>
+                  setFormData({ ...formData, createdAt: e.target.value })
+                }
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                设置文章的创建时间
+              </p>
             </div>
           </div>
         </div>
