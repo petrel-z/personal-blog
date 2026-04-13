@@ -10,6 +10,7 @@ import { loginSchema, type LoginInput } from '@/shared/validations'
 import { CaptchaInput } from './CaptchaInput'
 
 export function LoginForm() {
+  
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard'
