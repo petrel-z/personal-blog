@@ -45,7 +45,7 @@ export default function PublicLayout({
             <div className="flex items-center gap-2">
               <Cloud className="text-primary" size={20} />
               <h1 className="text-sm font-bold text-text-main hidden sm:block">
-                Petrel's Blog
+                Petrel&apos;s Blog
               </h1>
             </div>
           </div>
