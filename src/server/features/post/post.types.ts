@@ -13,6 +13,7 @@ export interface CreatePostInput {
   coverImage?: string
   status?: 'DRAFT' | 'PUBLISHED'
   isPinned?: boolean
+  createdAt?: string
 }
 
 export interface UpdatePostInput {
@@ -24,6 +25,7 @@ export interface UpdatePostInput {
   coverImage?: string | null
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   isPinned?: boolean
+  createdAt?: string
 }
 
 export interface PostListParams {

@@ -60,6 +60,34 @@ export async function POST(request: Request) {
       },
     })
 
+    // --- 新增逻辑：分配默认角色 ---
+    const defaultRoleName = 'member'; // 定义默认角色名
+
+    // 查找 'member' 角色
+    let defaultRole = await prisma.role.findUnique({
+      where: { name: defaultRoleName },
+    });
+
+    // 如果 'member' 角色不存在，则创建它 (可选，根据实际需求决定是否在此处自动创建)
+    if (!defaultRole) {
+      defaultRole = await prisma.role.create({
+        data: {
+          name: defaultRoleName,
+          description: 'Default role for new registered users',
+        },
+      });
+      console.log(`Role '${defaultRoleName}' created.`);
+    }
+
+    // 将用户与默认角色关联
+    await prisma.userRole.create({
+      data: {
+        userId: user.id,
+        roleId: defaultRole.id,
+      },
+    });
+    // --- 新增逻辑结束 ---
+
     return NextResponse.json(
       success(user, '注册成功'),
       { status: 201 }

@@ -475,6 +475,10 @@ export default function ArticleDetail() {
                     <span>{formatDate(article.publishedAt)}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    <Clock size={12} />
+                    <span>创建于 {formatDate(article.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
                     <Eye size={12} />
                     <span>{article.viewCount || 0}</span>
                   </div>

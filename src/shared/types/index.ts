@@ -60,6 +60,7 @@ export interface PostWithRelations {
   commentCount: number
   isPinned?: boolean
   publishedAt?: Date | null
+  createdAt?: Date | null
   category?: {
     id: string
     name: string

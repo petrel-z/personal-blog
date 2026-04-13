@@ -21,6 +21,7 @@ const createPostSchema = z.object({
   coverImage: z.string().url().optional().or(z.literal('')),
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
   isPinned: z.boolean().optional(),
+  createdAt: z.string().datetime().optional(),
 })
 
 // GET /api/posts
