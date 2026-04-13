@@ -26,6 +26,7 @@ export default function AuditLogsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
     fetchLogs()

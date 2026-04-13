@@ -6,6 +6,7 @@
 
 import { useState, useMemo, Suspense, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'motion/react'
 import { Search as SearchIcon, X } from 'lucide-react'
@@ -217,11 +218,11 @@ function SearchResultCard({
             href={`/post/${article.id}`}
             className="w-24 h-16 flex-shrink-0 rounded overflow-hidden"
           >
-            <img
+            <Image
               src={article.coverImage}
               alt={article.title}
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
+              fill
+              className="object-cover"
             />
           </Link>
         )}

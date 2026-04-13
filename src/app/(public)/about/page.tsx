@@ -4,6 +4,7 @@
 
 "use client";
 
+import Image from "next/image";
 import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -54,9 +55,11 @@ export default function About() {
         <div className="w-full md:w-64 flex-shrink-0 space-y-6">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-primary to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-            <img
+            <Image
               src="https://picsum.photos/seed/avatar/400/400"
               alt="Avatar"
+              width={400}
+              height={400}
               className="relative w-full aspect-square rounded-2xl object-cover border-4 border-background"
               referrerPolicy="no-referrer"
             />

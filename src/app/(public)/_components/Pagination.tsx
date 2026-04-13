@@ -15,11 +15,9 @@ interface PaginationProps {
 }
 
 export function Pagination({ current, totalPages, onPageChange }: PaginationProps) {
-  // No pagination needed if only 1 page
-  if (totalPages <= 1) return null
-
   // Generate page numbers with ellipsis
   const getPageNumbers = useCallback(() => {
+    if (totalPages <= 1) return []
     const pages: (number | 'ellipsis')[] = []
     const delta = 1 // Pages to show on each side of current
 
@@ -37,6 +35,9 @@ export function Pagination({ current, totalPages, onPageChange }: PaginationProp
 
     return pages
   }, [current, totalPages])
+
+  // No pagination needed if only 1 page
+  if (totalPages <= 1) return null
 
   return (
     <nav

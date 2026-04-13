@@ -4,6 +4,7 @@
  */
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Post } from './ArticleCard'
 
@@ -16,10 +17,11 @@ export function FeaturedBanner({ post }: FeaturedBannerProps) {
 
   return (
     <div className="relative h-44 sm:h-56 overflow-hidden group border-b border-border">
-      <img
+      <Image
         src={post.coverImage || 'https://picsum.photos/seed/banner/1200/600'}
         alt={post.title}
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+        fill
+        className="object-cover group-hover:scale-105 transition-transform duration-700"
         referrerPolicy="no-referrer"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-8">

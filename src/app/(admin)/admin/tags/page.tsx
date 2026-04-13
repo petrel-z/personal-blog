@@ -20,6 +20,7 @@ export default function TagsPage() {
   const [formData, setFormData] = useState({ name: '', slug: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       return

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { clsx } from 'clsx'
 
 interface CaptchaInputProps {
@@ -54,7 +55,6 @@ export function CaptchaInput({ value, onChange, error }: CaptchaInputProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      // Trigger parent form submit if on correct field
     }
   }
 
@@ -80,12 +80,15 @@ export function CaptchaInput({ value, onChange, error }: CaptchaInputProps) {
         />
         {/* Captcha Image */}
         {captchaUrl && (
-          <img
+          <Image
             src={captchaUrl}
             alt="验证码"
-            className="h-9 w-28 rounded border border-border cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover"
+            width={112}
+            height={36}
+            className="rounded border border-border cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover"
             onClick={handleClick}
             title="点击刷新验证码"
+            unoptimized
           />
         )}
         <button

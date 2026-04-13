@@ -4,6 +4,7 @@
  */
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { Eye, Heart, MessageCircle } from 'lucide-react'
@@ -76,11 +77,11 @@ export function ArticleCard({ post }: ArticleCardProps) {
             href={`/post/${post.id}`}
             className="w-full md:w-36 h-24 flex-shrink-0 rounded overflow-hidden relative group-hover:opacity-90 transition-opacity"
           >
-            <img
+            <Image
               src={post.coverImage}
               alt={post.title}
-              className="w-full h-full object-cover"
-              loading="lazy"
+              fill
+              className="object-cover"
             />
             {isPinned && (
               <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">

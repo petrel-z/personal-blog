@@ -47,6 +47,7 @@ export default function PostEditPage() {
   const [newTagName, setNewTagName] = useState('')
   const [isCreatingTag, setIsCreatingTag] = useState(false)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
     fetchData()
@@ -517,6 +518,7 @@ export default function PostEditPage() {
 
               {formData.coverImage ? (
                 <div className="relative w-full h-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={formData.coverImage}
                     alt="封面预览"

@@ -32,6 +32,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
   const [captchaId, setCaptchaId] = useState('')
   const [captchaImage, setCaptchaImage] = useState('')
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchComments()
     fetchCaptcha()
@@ -144,6 +145,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
                 required
               />
               {captchaImage && (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={captchaImage}
                   alt="验证码"

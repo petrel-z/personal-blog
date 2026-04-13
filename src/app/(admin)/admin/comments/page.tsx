@@ -27,6 +27,7 @@ export default function CommentsPage() {
   const [filter, setFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all')
   const [selectedComments, setSelectedComments] = useState<Set<string>>(new Set())
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
     fetchComments()

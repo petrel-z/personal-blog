@@ -20,6 +20,7 @@ export default function Archive() {
   const [timelineData, setTimelineData] = useState<AuditLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchData()
   }, [selectedYear])

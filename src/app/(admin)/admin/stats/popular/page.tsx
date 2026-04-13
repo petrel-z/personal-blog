@@ -12,6 +12,7 @@ export default function StatsPopularPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [period, setPeriod] = useState<'7d' | '30d' | '90d' | 'all'>('30d')
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
     fetchPopularPosts()
