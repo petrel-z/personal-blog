@@ -10,6 +10,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkDirective from "remark-directive";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeRaw from "rehype-raw";
 import rehypeHighlight from "rehype-highlight";
@@ -492,7 +493,7 @@ export default function ArticleDetail() {
               {/* Content */}
               <div className="prose dark:prose-invert">
                 <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
+                  remarkPlugins={[remarkGfm, remarkDirective]}
                   rehypePlugins={[
                     rehypeSanitize,
                     rehypeSlug,
