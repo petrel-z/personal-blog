@@ -31,6 +31,15 @@ const config: Config = {
           main: 'var(--text-main)',
           muted: 'var(--text-muted)',
         },
+        'archive-gold': {
+          0: 'var(--archive-gold-0)',
+          1: 'var(--archive-gold-1)',
+          2: 'var(--archive-gold-2)',
+          3: 'var(--archive-gold-3)',
+          4: 'var(--archive-gold-4)',
+          5: 'var(--archive-gold-5)',
+          6: 'var(--archive-gold-6)',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

@@ -29,6 +29,15 @@ html {
   --sidebar-active: #e0d7c1;
   --text-main: #2e3338;
   --text-muted: #5c5c5c;
+
+  /* Archive Gold Shades (Light Mode) */
+  --archive-gold-0: #f7efd8; /* 最浅，淡米金 */
+  --archive-gold-1: #e0ce8c; /* 浅金色 */
+  --archive-gold-2: #d1bb63; /* 亮金 */
+  --archive-gold-3: #c1a845; /* 中亮金 */
+  --archive-gold-4: #ae8b2d; /* 你给的主色，中间偏深 */
+  --archive-gold-5: #8e7020; /* 深古铜金 */
+  --archive-gold-6: #6e5616; /* 最深，暗金棕 */
 }
 
 .dark {
@@ -49,6 +58,15 @@ html {
   --sidebar-active: #2c2e33;
   --text-main: #c1c2c5;
   --text-muted: #909296;
+
+  /* Archive Gold Shades (Dark Mode) - 使用与亮色模式相同的值，如需调整请告知 */
+  --archive-gold-0: #f0e2b8;
+  --archive-gold-1: #e0ce8c;
+  --archive-gold-2: #d1bb63;
+  --archive-gold-3: #c1a845;
+  --archive-gold-4: #ae8b2d;
+  --archive-gold-5: #8e7020;
+  --archive-gold-6: #6e5616;
 }
 
 @layer base {

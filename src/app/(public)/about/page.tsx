@@ -39,7 +39,7 @@ const aboutContent = `
 如果你有任何问题或想进行技术交流，欢迎通过以下方式联系我：
 
 - **Email**: [zhaohaiyan1123@gmail.com](mailto:zhaohaiyan1123@gmail.com) /  [zhaohaiyan2027@qq.com](mailto:zhaohaiyan2027@qq.com)
-- **GitHub**: [Petrel](https://github.com/Petrel)
+- **GitHub**: [petrel-z](https://github.com/petrel-z)
 - **WeChat**: NZQR120
 - **QQ**: 1207574452
 `;
