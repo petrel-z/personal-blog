@@ -32,6 +32,17 @@ export async function getCategoryBySlug(slug: string) {
   })
 }
 
+export async function getCategoryById(id: string) {
+  return prisma.category.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: { posts: true },
+      },
+    },
+  })
+}
+
 export async function createCategory(data: {
   name: string
   slug: string

@@ -496,7 +496,7 @@ export default function ArticleDetail() {
                   rehypePlugins={[
                     rehypeSanitize,
                     rehypeSlug,
-                    [rehypeHighlight, { detect: true, aliases: { vue: 'html', jsx: 'javascript', tsx: 'typescript' } }],
+                    [rehypeHighlight, { aliases: { vue: 'html', jsx: 'javascript', tsx: 'typescript' } }],
                   ]}
                   components={{
                     pre: CodeBlock,
