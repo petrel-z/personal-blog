@@ -6,11 +6,16 @@ import { useAuth } from '../../../_components'
 import { useToast } from '@/components/ui/toaster'
 import { Upload, Image as ImageIcon, FileText, X, Plus, Search } from 'lucide-react'
 import type { Category, Tag } from '@/shared/types'
+import dynamic from 'next/dynamic'
+import { uploadImage } from '@/lib/upload-image'
+
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
 
 export default function NewPostPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
@@ -173,6 +178,24 @@ export default function NewPostPage() {
     }
   }
 
+  // 上传图片到文章内容
+  const handleContentImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const url = await uploadImage(file)
+      // 插入图片 markdown 到内容末尾
+      setFormData((prev) => ({
+        ...prev,
+        content: prev.content + `\n\n![${file.name}](${url})`,
+      }))
+      toast({ title: '图片上传成功', variant: 'success' })
+    } catch {
+      toast({ title: '图片上传失败', variant: 'error' })
+    }
+  }
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
@@ -326,20 +349,35 @@ export default function NewPostPage() {
             className="w-full text-3xl font-bold border-0 bg-transparent pb-4 focus:outline-none placeholder:text-muted-foreground/50"
           />
 
-          {/* Content - Auto expanding */}
-          <div className="relative">
-            <textarea
+          {/* Content - Markdown Editor */}
+          <div data-color-mode="light" className="border rounded-lg overflow-hidden" style={{ minHeight: '500px' }}>
+            <MDEditor
               value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              placeholder="请输入文章内容..."
-              className="w-full min-h-[500px] p-4 border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-              style={{ height: 'auto', minHeight: '500px' }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement
-                target.style.height = 'auto'
-                target.style.height = Math.max(500, target.scrollHeight) + 'px'
-              }}
+              onChange={(value) => setFormData({ ...formData, content: value || '' })}
+              height="100%"
+              preview="live"
             />
+            {/* Image Upload Button */}
+            <div className="flex items-center gap-2 p-2 border-t bg-card">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleContentImageUpload}
+              />
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground hover:text-primary hover:bg-sidebar-active/50 rounded transition-colors"
+              >
+                <ImageIcon className="w-4 h-4" />
+                插入图片
+              </button>
+              <span className="text-xs text-muted-foreground">
+                支持粘贴、拖拽或点击按钮上传图片
+              </span>
+            </div>
           </div>
         </div>
 

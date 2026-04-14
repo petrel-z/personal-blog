@@ -608,7 +608,7 @@ export default function ArticleDetail() {
             <footer className="mt-10 pt-3 border-t border-border">
               <div className="flex flex-wrap items-center justify-center gap-x-6  text-[10px] text-text-muted">
                 <p>© 2026 Petrel-Z. Powered by AI Studio.</p>
-                <div className="flex items-center gap-4">
+                {/* <div className="flex items-center gap-4">
                   <a
                     href="/about"
                     className="hover:text-primary transition-colors"
@@ -633,7 +633,7 @@ export default function ArticleDetail() {
                   >
                     友情链接
                   </a>
-                </div>
+                </div> */}
               </div>
             </footer>
           </div>
