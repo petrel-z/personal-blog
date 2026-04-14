@@ -26,7 +26,7 @@ interface CategoryInfo {
 
 export default function CategoryPage() {
   const params = useParams()
-  const slug = params.slug as string
+  const id = params.id as string
 
   const [category, setCategory] = useState<CategoryInfo | null>(null)
   const [articles, setArticles] = useState<PostWithRelations[]>([])
@@ -38,22 +38,17 @@ export default function CategoryPage() {
     try {
       setIsLoading(true)
 
-      // Fetch category info first to get categoryId
-      const categoriesResult = await api.get('/categories') as unknown as { code: number; data: CategoryInfo[]; message: string }
+      // Fetch category directly by id
+      const categoryResult = await api.get<CategoryInfo>(`/categories/${id}`) as unknown as { code: number; data: CategoryInfo; message: string }
 
-      if (categoriesResult.code === 2000 && categoriesResult.data) {
-        // API returns data as array directly
-        const categories = categoriesResult.data
-        const cat = categories.find((c: CategoryInfo) => c.slug === slug)
-        setCategory(cat || null)
+      if (categoryResult.code === 2000 && categoryResult.data) {
+        setCategory(categoryResult.data)
 
         // Then fetch posts with categoryId
-        if (cat?.id) {
-          const postsResult = await api.get('/posts', { page: currentPage, pageSize: 9, categoryId: cat.id, status: 'PUBLISHED' }) as unknown as { code: number; data: { items: PostWithRelations[]; total: number; totalPages: number }; message: string }
-          if (postsResult.code === 2000 && postsResult.data) {
-            setArticles(postsResult.data.items || [])
-            setTotalPages(postsResult.data.totalPages || 1)
-          }
+        const postsResult = await api.get('/posts', { page: currentPage, pageSize: 9, categoryId: id, status: 'PUBLISHED' }) as unknown as { code: number; data: { items: PostWithRelations[]; total: number; totalPages: number }; message: string }
+        if (postsResult.code === 2000 && postsResult.data) {
+          setArticles(postsResult.data.items || [])
+          setTotalPages(postsResult.data.totalPages || 1)
         }
       }
     } catch (error) {
@@ -61,7 +56,7 @@ export default function CategoryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [slug, currentPage])
+  }, [id, currentPage])
 
   useEffect(() => {
     fetchData()

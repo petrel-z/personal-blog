@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
-  getCategoryBySlug,
+  getCategoryById,
   updateCategory,
   deleteCategory,
 } from '@/server/features/category'
@@ -20,13 +20,13 @@ const updateCategorySchema = z.object({
   description: z.string().max(200).optional(),
 })
 
-// GET /api/categories/[id] or /api/categories/[slug]
+// GET /api/categories/[id]
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const category = await getCategoryBySlug(params.id)
+    const category = await getCategoryById(params.id)
 
     if (!category) {
       return NextResponse.json(errors.notFound('分类不存在'))

@@ -112,11 +112,11 @@ export function Sidebar() {
               <li className="px-6 py-2 text-sm text-text-muted">暂无分类</li>
             ) : (
               categories.map((cat) => {
-                const isActive = pathname === `/category/${cat.slug}`
+                const isActive = pathname === `/category/${cat.id}`
                 return (
                   <li key={cat.id}>
                     <Link
-                      href={`/category/${cat.slug}`}
+                      href={`/category/${cat.id}`}
                       className={cn(
                         'flex items-center justify-between px-6 py-2 text-sm transition-colors',
                         isActive

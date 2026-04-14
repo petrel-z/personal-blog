@@ -99,6 +99,8 @@ export default function Archive() {
     return action
   }
 
+  const [hoveredCell, setHoveredCell] = useState<{ date: string; count: number; x: number; y: number } | null>(null)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -122,14 +124,14 @@ export default function Archive() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 text-xs font-bold text-text-muted">
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 bg-sidebar-active/20 dark:bg-sidebar-active/10 rounded-sm"></span>
+                <span className="w-3 h-3 bg-[#ebedf0] dark:bg-[#161b22] rounded-sm"></span>
                 Less
               </span>
               <div className="flex gap-1">
-                <span className="w-3 h-3 bg-primary/20 rounded-sm"></span>
-                <span className="w-3 h-3 bg-primary/40 rounded-sm"></span>
-                <span className="w-3 h-3 bg-primary/60 rounded-sm"></span>
-                <span className="w-3 h-3 bg-primary/80 rounded-sm"></span>
+                <span className="w-3 h-3 bg-primary/30 rounded-sm"></span>
+                <span className="w-3 h-3 bg-primary/50 rounded-sm"></span>
+                <span className="w-3 h-3 bg-primary/70 rounded-sm"></span>
+                <span className="w-3 h-3 bg-primary rounded-sm"></span>
               </div>
               <span className="flex items-center gap-1">More</span>
             </div>
@@ -148,7 +150,27 @@ export default function Archive() {
           {isLoading ? (
             <div className="h-24 bg-sidebar rounded-lg animate-pulse" />
           ) : (
-            <div className="overflow-x-auto pb-4">
+            <div className="overflow-x-auto pb-4 relative">
+              {/* Tooltip */}
+              {hoveredCell && (
+                <div
+                  className="absolute z-50 px-3 py-2 text-xs bg-popover border border-border rounded-lg shadow-lg pointer-events-none whitespace-nowrap"
+                  style={{
+                    left: hoveredCell.x,
+                    top: hoveredCell.y,
+                    transform: 'translate(-50%, -100%)',
+                  }}
+                >
+                  <div className="font-bold text-foreground">{hoveredCell.date}</div>
+                  <div className="text-muted-foreground">
+                    {hoveredCell.count > 0 ? (
+                      <>发布 <span className="text-primary font-bold">{hoveredCell.count}</span> 篇文章</>
+                    ) : (
+                      '暂无发布'
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-1 min-w-[800px]">
                 {/* Weekday labels */}
                 <div className="flex flex-col gap-[2px] pr-2 text-[10px] text-text-muted justify-around">
@@ -240,25 +262,33 @@ export default function Archive() {
                             const dayName = `${day.getFullYear()}年${day.getMonth() + 1}月${day.getDate()}日`
                             // Calculate intensity: each article adds one level of darkness
                             const getIntensityClass = (c: number) => {
-                              if (c === 0) return 'bg-sidebar'
-                              if (c === 1) return 'bg-primary/20'
-                              if (c === 2) return 'bg-primary/30'
-                              if (c === 3) return 'bg-primary/40'
-                              if (c === 4) return 'bg-primary/50'
-                              if (c === 5) return 'bg-primary/60'
-                              if (c === 6) return 'bg-primary/70'
-                              if (c === 7) return 'bg-primary/80'
-                              if (c === 8) return 'bg-primary/90'
-                              return 'bg-primary'
+                              if (c === 0) return 'bg-[#ebedf0] dark:bg-[#161b22]'
+                              if (c === 1) return 'bg-primary/40'
+                              if (c === 2) return 'bg-primary/55'
+                              if (c === 3) return 'bg-primary/70'
+                              if (c === 4) return 'bg-primary/80'
+                              if (c === 5) return 'bg-primary/90'
+                              if (c >= 6) return 'bg-primary'
+                              return 'bg-[#ebedf0] dark:bg-[#161b22]'
                             }
                             return (
                               <div
                                 key={dayIndex}
                                 className={cn(
-                                  'w-3 h-3 rounded-sm transition-colors hover:ring-2 hover:ring-primary cursor-pointer',
+                                  'w-3 h-3 rounded-sm transition-all hover:ring-2 hover:ring-primary/50 hover:scale-125 cursor-pointer relative',
                                   getIntensityClass(count)
                                 )}
-                                title={`${dayName}：${count} 篇文章`}
+                                onMouseEnter={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  const parentRect = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect()
+                                  setHoveredCell({
+                                    date: dayName,
+                                    count,
+                                    x: rect.left - (parentRect?.left || 0) + rect.width / 2,
+                                    y: rect.top - (parentRect?.top || 0) - 8,
+                                  })
+                                }}
+                                onMouseLeave={() => setHoveredCell(null)}
                               />
                             )
                           })}
