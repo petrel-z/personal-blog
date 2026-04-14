@@ -19,28 +19,29 @@ import {
 const aboutContent = `
 # 关于我
 
-你好！我是 **tl.s**，一名热爱技术的开发者。
+你好！我是 **petrel**，一名热爱技术也热爱生活的开发者。
 
-这个博客是我记录技术成长、生活感悟以及分享有趣事物的地方。
+这个博客是我记录技术成长、生活感悟、随笔、读书、电影感悟以及分享有趣事物的地方。
 
 ## 技能栈
 
-- **Frontend**: React, Vue, TypeScript, Tailwind CSS
-- **Backend**: Node.js, Go, Python
-- **Infrastructure**: Kubernetes, Docker, Ceph, Linux
-- **Tools**: Vim, Git, macOS
+- **Frontend**: HTML，CSS，JS，React, Vue, TypeScript, Tailwind CSS， Uniapp
+- **Backend**: Node.js， Python， mysql
+- **Infrastructure**: Docker,  Linux
+- **Tools**: Vim, Git
 
 ## 个人格言
 
-> 烹茶煮酒，对月吟诗。煮雪烹茶，详情见于本站。
+> 有的人活了10000天，而有的人只活了1天，重复了10000次。
 
 ## 联系我
 
 如果你有任何问题或想进行技术交流，欢迎通过以下方式联系我：
 
-- **Email**: [zhaohaiyan1123@gmail.com](mailto:zhaohaiyan1123@gmail.com)
+- **Email**: [zhaohaiyan1123@gmail.com](mailto:zhaohaiyan1123@gmail.com) /  [zhaohaiyan2027@qq.com](mailto:zhaohaiyan2027@qq.com)
 - **GitHub**: [Petrel](https://github.com/Petrel)
-- **Twitter**: [@Petrel](https://twitter.com/Petrel)
+- **WeChat**: NZQR120
+- **QQ**: 1207574452
 `;
 
 export default function About() {
