@@ -67,15 +67,15 @@ export default function About() {
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-text-main">tl.s</h2>
+            <h2 className="text-2xl font-bold text-text-main"></h2>
             <p className="text-sm text-text-muted leading-relaxed">
-              Full-stack Developer / Tech Enthusiast / Tea Lover
+              Full-stack Developer / Tech Enthusiast
             </p>
 
             <div className="space-y-2">
               <div className="flex items-center gap-3 text-xs text-text-muted">
                 <MapPin size={14} className="text-primary" />
-                <span>Beijing, China</span>
+                <span>XinXiang, China</span>
               </div>
               <div className="flex items-center gap-3 text-xs text-text-muted">
                 <Briefcase size={14} className="text-primary" />
@@ -89,16 +89,10 @@ export default function About() {
 
             <div className="flex items-center gap-3 pt-4">
               <a
-                href="#"
+                href="https://github.com/petrel-z"
                 className="p-2 rounded-lg bg-sidebar-active/20 dark:bg-sidebar-active/10 text-text-muted hover:text-primary transition-colors"
               >
                 <Github size={18} />
-              </a>
-              <a
-                href="#"
-                className="p-2 rounded-lg bg-sidebar-active/20 dark:bg-sidebar-active/10 text-text-muted hover:text-primary transition-colors"
-              >
-                <Twitter size={18} />
               </a>
               <a
                 href="#"

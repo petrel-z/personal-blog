@@ -31,7 +31,7 @@ export default function Archive() {
     try {
       setIsLoading(true);
 
-      // Fetch audit logs for the selected year
+      // Fetch posts for the selected year
       const startDate = format(
         startOfYear(new Date(selectedYear, 0, 1)),
         "yyyy-MM-dd",
@@ -41,27 +41,25 @@ export default function Archive() {
         "yyyy-MM-dd",
       );
 
-      const result = (await api.get("/audit-logs", {
+      const result = (await api.get("/posts", {
         page: 1,
         pageSize: 1000,
         startDate,
         endDate,
       })) as unknown as {
         code: number;
-        data: { items: AuditLog[]; total: number };
+        data: { items: { id: string; title: string; createdAt: string }[]; total: number };
         message: string;
       };
 
       if (result.code === 2000 && result.data) {
-        const logs = result.data.items || [];
+        const posts = result.data.items || [];
 
-        // Process heatmap data - count posts per day
+        // Process heatmap data - count posts per day by createdAt
         const dayCount: Record<string, number> = {};
-        logs.forEach((log) => {
-          if (log.action.includes("POST")) {
-            const date = format(new Date(log.createdAt), "yyyy-MM-dd");
-            dayCount[date] = (dayCount[date] || 0) + 1;
-          }
+        posts.forEach((post) => {
+          const date = format(new Date(post.createdAt), "yyyy-MM-dd");
+          dayCount[date] = (dayCount[date] || 0) + 1;
         });
 
         // Generate heatmap data for the year
@@ -78,7 +76,22 @@ export default function Archive() {
         }));
 
         setHeatmapData(heatmap);
-        setTimelineData(logs.slice(0, 20)); // Show recent 20 activities
+
+        // Timeline: use posts with createdAt, mapped to AuditLog format
+        const timelineFromPosts: AuditLog[] = posts
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 20)
+          .map((post) => ({
+            id: post.id,
+            userId: null,
+            action: "POST",
+            target: post.title,
+            details: null,
+            ipAddress: null,
+            userAgent: null,
+            createdAt: new Date(post.createdAt),
+          }));
+        setTimelineData(timelineFromPosts);
       }
     } catch (error) {
       console.error("Failed to fetch archive data:", error);
