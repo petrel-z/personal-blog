@@ -13,10 +13,10 @@ import {
   LayoutGrid,
   User,
   MessageSquare,
-  Rss,
   Link as LinkIcon,
   Archive,
   ChevronDown,
+  Github,
 } from 'lucide-react'
 import { api } from '@/client/api'
 import { cn } from '@/lib/utils'
@@ -39,7 +39,11 @@ interface CategoryWithCount {
   postCount: number
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true)
   const [categories, setCategories] = useState<CategoryWithCount[]>([])
@@ -47,6 +51,14 @@ export function Sidebar() {
   useEffect(() => {
     fetchCategories()
   }, [])
+
+  // Close sidebar on navigation (mobile)
+  useEffect(() => {
+    if (onNavigate) {
+      onNavigate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   const fetchCategories = async () => {
     try {
@@ -140,15 +152,23 @@ export function Sidebar() {
       {/* Bottom Fixed Section: Icons */}
       <div className="flex-shrink-0 p-4 border-t border-border/50 bg-sidebar">
         <div className="flex items-center justify-center gap-6 py-2 text-text-muted">
-          <button className="hover:text-primary transition-colors">
+          <a
+            href="https://github.com/petrel-z"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors"
+          >
+            <Github size={18} />
+          </a>
+          {/* <button className="hover:text-primary transition-colors">
             <MessageSquare size={18} />
-          </button>
-          <button className="hover:text-primary transition-colors">
+          </button> */}
+          {/* <button className="hover:text-primary transition-colors">
             <Rss size={18} />
-          </button>
-          <button className="hover:text-primary transition-colors">
+          </button> */}
+          {/* <button className="hover:text-primary transition-colors">
             <Archive size={18} />
-          </button>
+          </button> */}
         </div>
       </div>
     </aside>
