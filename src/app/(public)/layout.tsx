@@ -18,6 +18,7 @@ export default function PublicLayout({
 }) {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true)
   const [isDark, setIsDark] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   const toggleTheme = () => {
     setIsDark(!isDark)
@@ -32,11 +33,18 @@ export default function PublicLayout({
           {/* Logo & Toggle */}
           <div className="flex items-center gap-4 flex-shrink-0">
             <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              onClick={() => {
+                // Mobile: toggle mobile drawer, Desktop: toggle inline sidebar
+                if (window.innerWidth < 1024) {
+                  setIsMobileSidebarOpen(!isMobileSidebarOpen)
+                } else {
+                  setIsSidebarVisible(!isSidebarVisible)
+                }
+              }}
               className="p-2 rounded hover:bg-sidebar-active/50 text-text-muted hover:text-primary transition-colors"
               title={isSidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
             >
-              {isSidebarVisible ? (
+              {isSidebarVisible || isMobileSidebarOpen ? (
                 <PanelLeftClose size={20} />
               ) : (
                 <PanelLeftOpen size={20} />
@@ -85,16 +93,36 @@ export default function PublicLayout({
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Collapsible */}
+        {/* Mobile Overlay Backdrop */}
+        {isMobileSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        )}
+
+        {/* Left Sidebar - Desktop: inline collapsible, Mobile: fixed overlay drawer */}
         <aside
           className={cn(
-            'border-r border-border bg-sidebar transition-all duration-300 ease-in-out overflow-hidden h-full',
-            isSidebarVisible ? 'w-64' : 'w-0'
+            'bg-sidebar transition-all duration-300 ease-in-out overflow-hidden h-full',
+            // Mobile: fixed overlay drawer
+            'fixed inset-y-0 left-0 z-50 w-64',
+            // Desktop: inline sidebar
+            'lg:relative lg:inset-auto lg:z-auto lg:w-64 lg:border-r lg:border-border',
+            // Mobile: control visibility by width
+            !isMobileSidebarOpen && 'lg:translate-x-0 -translate-x-full',
+            // Desktop: control visibility by isSidebarVisible
+            !isSidebarVisible && 'lg:w-0 lg:overflow-hidden'
           )}
+          style={{ transform: isMobileSidebarOpen ? 'translateX(0)' : undefined }}
         >
-          <div className={cn('h-full', !isSidebarVisible && 'hidden')}>
-            <Sidebar />
-          </div>
+          <Sidebar
+            onNavigate={() => {
+              if (window.innerWidth < 1024) {
+                setIsMobileSidebarOpen(false)
+              }
+            }}
+          />
         </aside>
 
         {/* Page Content */}

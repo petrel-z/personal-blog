@@ -39,7 +39,11 @@ interface CategoryWithCount {
   postCount: number
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true)
   const [categories, setCategories] = useState<CategoryWithCount[]>([])
@@ -47,6 +51,14 @@ export function Sidebar() {
   useEffect(() => {
     fetchCategories()
   }, [])
+
+  // Close sidebar on navigation (mobile)
+  useEffect(() => {
+    if (onNavigate) {
+      onNavigate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   const fetchCategories = async () => {
     try {
