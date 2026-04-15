@@ -13,10 +13,10 @@ import {
   LayoutGrid,
   User,
   MessageSquare,
-  Rss,
   Link as LinkIcon,
   Archive,
   ChevronDown,
+  Github,
 } from 'lucide-react'
 import { api } from '@/client/api'
 import { cn } from '@/lib/utils'
@@ -152,15 +152,23 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       {/* Bottom Fixed Section: Icons */}
       <div className="flex-shrink-0 p-4 border-t border-border/50 bg-sidebar">
         <div className="flex items-center justify-center gap-6 py-2 text-text-muted">
-          <button className="hover:text-primary transition-colors">
+          <a
+            href="https://github.com/petrel-z"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors"
+          >
+            <Github size={18} />
+          </a>
+          {/* <button className="hover:text-primary transition-colors">
             <MessageSquare size={18} />
-          </button>
-          <button className="hover:text-primary transition-colors">
+          </button> */}
+          {/* <button className="hover:text-primary transition-colors">
             <Rss size={18} />
-          </button>
-          <button className="hover:text-primary transition-colors">
+          </button> */}
+          {/* <button className="hover:text-primary transition-colors">
             <Archive size={18} />
-          </button>
+          </button> */}
         </div>
       </div>
     </aside>
