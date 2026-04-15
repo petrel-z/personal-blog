@@ -28,6 +28,9 @@ import {
   Copy,
   Check,
   List,
+  X,
+  PanelBottom,
+  AlignLeft,
 } from "lucide-react";
 import { api } from "@/client/api";
 import { TableOfContents } from "../../_components/TableOfContents";
@@ -106,6 +109,9 @@ export default function ArticleDetail() {
   const [isCategoryListVisible, setIsCategoryListVisible] = useState(true);
   const [isPageLoading, setIsPageLoading] = useState(true); // 页面初始加载
   const [isArticleLoading, setIsArticleLoading] = useState(false); // 文章切换加载
+  // Mobile bottom sheets
+  const [showMobileArticles, setShowMobileArticles] = useState(false);
+  const [showMobileTOC, setShowMobileTOC] = useState(false);
 
   // 左侧分类文章列表分页状态
   const [categoryPage, setCategoryPage] = useState(1);
@@ -446,7 +452,7 @@ export default function ArticleDetail() {
         {/* Main Content Area (2/4 width, Scrollable) */}
         <div
           ref={contentScrollRef}
-          className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar"
+          className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar pb-16 lg:pb-0"
         >
           <div className="max-w-4xl mx-auto w-full px-8 py-4">
             <article className="overflow-hidden">
@@ -696,6 +702,144 @@ export default function ArticleDetail() {
               <List size={20} />
             </button>
           </div>
+        )}
+
+        {/* Mobile Bottom Bar - Fixed at bottom */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border">
+          <div className="flex items-center justify-between px-4 py-2">
+            <button
+              onClick={() => {
+                setShowMobileArticles(!showMobileArticles);
+                setShowMobileTOC(false);
+              }}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors",
+                showMobileArticles
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-sidebar text-text-muted hover:text-primary"
+              )}
+            >
+              <AlignLeft size={16} />
+              {article.category?.name || "文章列表"}
+            </button>
+            <button
+              onClick={() => {
+                setShowMobileTOC(!showMobileTOC);
+                setShowMobileArticles(false);
+              }}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors",
+                showMobileTOC
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-sidebar text-text-muted hover:text-primary"
+              )}
+            >
+              <PanelBottom size={16} />
+              目录
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Articles Bottom Sheet */}
+        {showMobileArticles && (
+          <>
+            <div
+              className="lg:hidden fixed inset-0 bg-black/50 z-40"
+              onClick={() => setShowMobileArticles(false)}
+            />
+            <div className="lg:hidden bg-background pb-4 fixed left-0 right-0 bottom-0 z-50 bg-popover border-t border-border rounded-t-xl shadow-xl min-h-[60vh] overflow-hidden animate-in slide-in-from-bottom fade-in duration-200">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <List size={14} />
+                  {article.category?.name || "未分类"}
+                </h3>
+                <button
+                  onClick={() => setShowMobileArticles(false)}
+                  className="p-1.5 rounded hover:bg-sidebar-active/50 text-text-muted transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-y-auto custom-scrollbar max-h-[calc(60vh-4rem)]">
+                <div className="p-2">
+                  {categoryArticles.map((item) => {
+                    const isActive = item.id === id;
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/post/${item.id}`}
+                        onClick={() => setShowMobileArticles(false)}
+                        className={cn(
+                          "block py-2 px-3 rounded text-sm transition-colors line-clamp-2",
+                          isActive
+                            ? "bg-primary/10 text-primary font-bold"
+                            : "text-text-muted hover:bg-sidebar-active/50 hover:text-text-main",
+                        )}
+                      >
+                        {item.title}
+                      </Link>
+                    );
+                  })}
+                  {isLoadingMore && (
+                    <div className="py-2 px-3 text-xs text-text-muted text-center">
+                      加载中...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Mobile TOC Bottom Sheet */}
+        {showMobileTOC && (
+          <>
+            <div
+              className="lg:hidden fixed inset-0 bg-black/50 z-40"
+              onClick={() => setShowMobileTOC(false)}
+            />
+            <div className="lg:hidden bg-background fixed left-0 right-0 bottom-0 pb-4  z-50 bg-popover border-t border-border rounded-t-xl shadow-xl min-h-[60vh] overflow-hidden animate-in slide-in-from-bottom fade-in duration-200">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <PanelBottom size={14} />
+                  文章目录
+                </h3>
+                <button
+                  onClick={() => setShowMobileTOC(false)}
+                  className="p-1.5 rounded hover:bg-sidebar-active/50 text-text-muted transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-y-auto custom-scrollbar max-h-[calc(60vh-4rem)] p-4">
+                {hasTOCItems ? (
+                  <nav className="space-y-1">
+                    {tocItems.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          scrollToHeading(item.id);
+                          setShowMobileTOC(false);
+                        }}
+                        className={cn(
+                          "block w-full text-left py-1.5 px-2 rounded text-sm transition-colors hover:bg-sidebar-active/50",
+                          item.level === 1 && "font-medium",
+                          item.level === 2 && "pl-4 text-xs",
+                          item.level === 3 && "pl-8 text-xs text-text-muted"
+                        )}
+                      >
+                        {item.text}
+                      </button>
+                    ))}
+                  </nav>
+                ) : (
+                  <p className="text-sm text-text-muted text-center py-4">
+                    暂无目录
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </div>
     </PageError>
