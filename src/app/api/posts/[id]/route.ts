@@ -9,10 +9,12 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { prisma } from '@/server/db'
 import { getPostById, updatePost, deletePost, getAdjacentPosts } from '@/server/features/post'
 import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 import { success, errors } from '@/lib/api-response'
+import { getClientIp } from '@/server/lib/request'
 
 const updatePostSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -32,6 +34,35 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const ip = getClientIp(request) || 'unknown'
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // 检查是否已浏览（同一IP每天每篇只计一次）
+    const existingView = await prisma.postView.findFirst({
+      where: {
+        ip,
+        postId: params.id,
+        viewedAt: { gte: today },
+      },
+    })
+
+    if (!existingView) {
+      // 使用事务创建浏览记录并增加浏览量
+      await prisma.$transaction([
+        prisma.postView.create({
+          data: {
+            ip,
+            postId: params.id,
+          },
+        }),
+        prisma.post.update({
+          where: { id: params.id },
+          data: { viewCount: { increment: 1 } },
+        }),
+      ])
+    }
+
     const post = await getPostById(params.id)
 
     if (!post) {

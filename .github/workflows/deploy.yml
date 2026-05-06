@@ -58,6 +58,7 @@ jobs:
             git pull origin main
             corepack enable
             pnpm install --frozen-lockfile
+            pnpm prisma db push
             pnpm prisma generate
             pnpm build
             pm2 restart blog
