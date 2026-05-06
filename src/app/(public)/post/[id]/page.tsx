@@ -33,6 +33,7 @@ import {
   AlignLeft,
 } from "lucide-react";
 import { api } from "@/client/api";
+import confetti from "canvas-confetti";
 import { TableOfContents } from "../../_components/TableOfContents";
 import { CommentSection } from "../../_components/CommentSection";
 import { cn } from "@/lib/utils";
@@ -176,6 +177,9 @@ export default function ArticleDetail() {
           setLikeCount(result.data.likeCount || 0);
           isFirstLoad.current = false;
 
+          // 获取点赞状态
+          fetchLikeStatus(signal);
+
           // Fetch first page of articles in the same category
           if (result.data.category?.id) {
             setCategoryPage(1);
@@ -212,6 +216,22 @@ export default function ArticleDetail() {
     },
     [id],
   );
+
+  // 获取点赞状态
+  const fetchLikeStatus = async (signal?: AbortSignal) => {
+    try {
+      const result = (await api.get(`/posts/${id}/like`, undefined, {
+        signal,
+      })) as { code: number; data: { liked: boolean; likeCount: number }; message: string };
+      if (result.code === 2000 && result.data) {
+        setIsLiked(result.data.liked);
+        setLikeCount(result.data.likeCount);
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("Failed to fetch like status:", error);
+    }
+  };
 
   // 加载更多分类文章
   const loadMoreCategoryArticles = useCallback(
@@ -316,10 +336,37 @@ export default function ArticleDetail() {
     ? Math.ceil(article.content.length / 300)
     : 0;
 
-  const handleLike = () => {
-    if (!isLiked) {
-      setIsLiked(true);
-      setLikeCount((prev) => prev + 1);
+  // 点赞节流
+  const isLikingRef = useRef(false);
+
+  const handleLike = async () => {
+    if (isLikingRef.current) return;
+    isLikingRef.current = true;
+    try {
+      const result = (await api.post(`/posts/${id}/like`)) as {
+        code: number;
+        data: { liked: boolean; likeCount: number };
+        message: string;
+      };
+      if (result.code === 2000 && result.data) {
+        setIsLiked(result.data.liked);
+        setLikeCount(result.data.likeCount); // 使用 API 返回的值
+        if (result.data.liked) {
+          // 触发烟花效果
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to toggle like:", error);
+    } finally {
+      // 延迟解除节流，防止快速重复点击
+      setTimeout(() => {
+        isLikingRef.current = false;
+      }, 500);
     }
   };
 
@@ -517,7 +564,6 @@ export default function ArticleDetail() {
               <div className="mt-16 flex flex-col items-center gap-6 py-10 border-t border-border">
                 <button
                   onClick={handleLike}
-                  disabled={isLiked}
                   className={`flex flex-col items-center gap-2 group transition-all ${
                     isLiked
                       ? "text-primary"
