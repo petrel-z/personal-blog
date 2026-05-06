@@ -114,6 +114,7 @@ model Post {
 
   tags     Tag[]
   comments Comment[]
+  views    PostView[]
 
   publishedAt DateTime?
   deletedAt   DateTime?
@@ -250,4 +251,20 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ============================================
+// Post View Tracking
+// ============================================
+
+model PostView {
+  id       String @id @default(cuid())
+  ip       String
+  postId   String
+  post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  viewedAt DateTime @default(now())
+
+  @@unique([ip, postId, viewedAt])
+  @@index([ip, viewedAt])
+  @@index([postId])
 }
