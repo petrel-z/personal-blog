@@ -268,3 +268,20 @@ model PostView {
   @@index([ip, viewedAt])
   @@index([postId])
 }
+
+// ============================================
+// Post Like (Soft Delete)
+// ============================================
+
+model PostLike {
+  id        String    @id @default(cuid())
+  ip        String
+  postId    String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // 软删除标记
+
+  @@unique([ip, postId])
+  @@index([ip])
+  @@index([postId])
+  @@index([deletedAt])
+}
