@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 
 import * as Dialog from '@radix-ui/react-dialog'
 import { Search, X } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import { usePathname } from 'next/navigation'
 import { useArticleSearch } from '@/client/hooks/useArticleSearch'
 
 const SearchResults = dynamic(() => import('./SearchResults').then(module => module.SearchResults), { ssr: false })
@@ -13,9 +14,23 @@ export function SearchDialog() {
   const inputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
+  const navigatingRef = useRef(false)
+  const pathname = usePathname()
+  const previousPathRef = useRef(pathname)
+
+  const closeForNavigation = useCallback(() => {
+    navigatingRef.current = true
+    setOpen(false)
+  }, [])
+
+  useEffect(() => {
+    if (previousPathRef.current !== pathname && open) closeForNavigation()
+    previousPathRef.current = pathname
+  }, [pathname, open, closeForNavigation])
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     if (nextOpen && !open) {
+      navigatingRef.current = false
       previousFocusRef.current = document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null
@@ -68,6 +83,8 @@ export function SearchDialog() {
           }}
           onCloseAutoFocus={event => {
             event.preventDefault()
+            // Let the destination page manage focus when following a result.
+            if (navigatingRef.current) return
             const previousFocus = previousFocusRef.current
             const target = previousFocus?.isConnected && previousFocus !== document.body
               ? previousFocus
@@ -80,19 +97,26 @@ export function SearchDialog() {
         >
           <Dialog.Title className="sr-only">搜索文章</Dialog.Title>
           <Dialog.Description className="sr-only">
-            输入关键词后自动搜索，按 Enter 立即搜索，按 Esc 或点击背景关闭搜索。
+            输入关键词后自动搜索，按 Enter 立即搜索。用上下方向键选择结果，再按 Enter 打开文章。按 Esc 或点击背景关闭搜索。
           </Dialog.Description>
-          <SearchInput inputRef={inputRef} />
+          <SearchInput inputRef={inputRef} onNavigate={closeForNavigation} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
   )
 }
 
-function SearchInput({ inputRef }: { inputRef: RefObject<HTMLInputElement> }) {
+function SearchInput({ inputRef, onNavigate }: { inputRef: RefObject<HTMLInputElement>; onNavigate: () => void }) {
   const search = useArticleSearch()
   const statusId = useId()
+  const resultsId = useId()
+  const helpId = useId()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const { state } = search
+  const items = state.status === 'success' ? state.data.items : []
+  const selectedIndex = items.findIndex(item => item.id === selectedId)
+  const activeDescendant = selectedIndex >= 0 ? `${resultsId}-${items[selectedIndex].id}` : undefined
+  const hasResults = items.length > 0
   const statusText = state.status === 'success'
     ? state.data.total > 0 ? `找到 ${state.data.total} 篇相关文章` : '没有找到相关文章，换个关键词试试'
     : state.status === 'error' ? state.message
@@ -107,19 +131,44 @@ function SearchInput({ inputRef }: { inputRef: RefObject<HTMLInputElement> }) {
         <input
           ref={inputRef}
           type="search"
+          role="combobox"
           aria-label="搜索关键词"
-          aria-describedby={statusId}
+          aria-describedby={`${statusId} ${helpId}`}
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-expanded={hasResults}
+          aria-controls={hasResults ? resultsId : undefined}
+          aria-activedescendant={activeDescendant}
           placeholder="搜索文章..."
           autoComplete="off"
           spellCheck={false}
           value={search.value}
-          onChange={event => search.change(event.currentTarget.value)}
-          onCompositionStart={search.startComposition}
+          onChange={event => {
+            setSelectedId(null)
+            search.change(event.currentTarget.value)
+          }}
+          onCompositionStart={() => {
+            setSelectedId(null)
+            search.startComposition()
+          }}
           onCompositionEnd={event => search.endComposition(event.currentTarget.value)}
           onKeyDown={event => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
-            event.preventDefault()
-            search.submit()
+            if (
+              event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229 ||
+              event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+            ) return
+            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && hasResults) {
+              event.preventDefault()
+              const nextIndex = selectedIndex < 0
+                ? event.key === 'ArrowDown' ? 0 : items.length - 1
+                : Math.max(0, Math.min(items.length - 1, selectedIndex + (event.key === 'ArrowDown' ? 1 : -1)))
+              setSelectedId(items[nextIndex].id)
+            } else if (event.key === 'Enter') {
+              event.preventDefault()
+              // Use the same real link for pointer and keyboard navigation.
+              if (activeDescendant) document.getElementById(activeDescendant)?.click()
+              else search.submit()
+            }
           }}
           className="h-14 min-w-0 flex-1 bg-transparent text-base text-text-main outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
         />
@@ -128,6 +177,7 @@ function SearchInput({ inputRef }: { inputRef: RefObject<HTMLInputElement> }) {
             type="button"
             aria-label="清空关键词"
             onClick={() => {
+              setSelectedId(null)
               search.clear()
               inputRef.current?.focus({ preventScroll: true })
             }}
@@ -147,10 +197,14 @@ function SearchInput({ inputRef }: { inputRef: RefObject<HTMLInputElement> }) {
           </button>
         </Dialog.Close>
       </div>
-      <p id={statusId} role="status" aria-atomic="true" className="shrink-0 px-3 pb-1 pt-3 text-sm text-text-muted">
-        {statusText}
-      </p>
-      <SearchResults state={state} onRetry={search.submit} onLoadMore={search.loadMore} />
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 pb-1 pt-3 text-sm text-text-muted">
+        <p id={statusId} role="status" aria-atomic="true">{statusText}</p>
+        <p id={helpId} className={hasResults ? 'text-xs' : 'sr-only'}>↑↓ 选择 · Enter 打开</p>
+      </div>
+      <SearchResults
+        state={state} listId={resultsId} activeId={activeDescendant}
+        onRetry={search.submit} onLoadMore={search.loadMore} onNavigate={onNavigate}
+      />
     </>
   )
 }

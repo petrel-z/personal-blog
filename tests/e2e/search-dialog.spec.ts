@@ -22,7 +22,7 @@ test('clicking the header opens a focused search dialog and Escape returns to th
 
   await trigger.click()
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByRole('searchbox', { name: '搜索关键词' })).toBeFocused()
+  await expect(dialog.getByRole('combobox', { name: '搜索关键词' })).toBeFocused()
   await expect(page).toHaveURL('/about')
 
   await page.keyboard.press('Escape')
@@ -37,11 +37,11 @@ for (const shortcut of ['Control+k', 'Meta+k']) {
     await page.keyboard.press(shortcut)
 
     const dialog = page.getByRole('dialog', { name: '搜索文章' })
-    await expect(dialog.getByRole('searchbox')).toBeFocused()
+    await expect(dialog.getByRole('combobox')).toBeFocused()
     // Repeating the shortcut should keep the existing dialog open and focus its input.
     await dialog.getByRole('button', { name: '关闭搜索' }).focus()
     await page.keyboard.press(shortcut)
-    await expect(dialog.getByRole('searchbox')).toBeFocused()
+    await expect(dialog.getByRole('combobox')).toBeFocused()
     await page.keyboard.press('Escape')
     await expect(originalFocus).toBeFocused()
   })
@@ -50,7 +50,7 @@ for (const shortcut of ['Control+k', 'Meta+k']) {
 test('Tab stays within search and the close button closes it', async ({ page }) => {
   await page.getByRole('button', { name: '搜索文章', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '搜索文章' })
-  const input = dialog.getByRole('searchbox')
+  const input = dialog.getByRole('combobox')
   const close = dialog.getByRole('button', { name: '关闭搜索' })
 
   await page.keyboard.press('Shift+Tab')
@@ -90,7 +90,7 @@ test('opening search locks background scrolling and closing preserves the readin
 
 test('typing and pressing Enter keep the current page open', async ({ page }) => {
   await page.getByRole('button', { name: '搜索文章', exact: true }).click()
-  const input = page.getByRole('dialog').getByRole('searchbox')
+  const input = page.getByRole('dialog').getByRole('combobox')
   await input.fill('接口权限 C++')
   await input.press('Enter')
   await expect(input).toHaveValue('接口权限 C++')
@@ -101,7 +101,7 @@ for (const pathname of ['/', '/archive']) {
   test(`search is available on ${pathname} without navigating away`, async ({ page }) => {
     await page.goto(pathname)
     await page.getByRole('button', { name: '搜索文章', exact: true }).click()
-    await expect(page.getByRole('dialog').getByRole('searchbox')).toBeFocused()
+    await expect(page.getByRole('dialog').getByRole('combobox')).toBeFocused()
     await page.keyboard.press('Escape')
     await expect(page).toHaveURL(pathname)
   })
@@ -113,7 +113,7 @@ test('the search dialog fits a narrow mobile screen and remains usable above the
   await expect(trigger).toBeInViewport()
   await trigger.click()
   const dialog = page.getByRole('dialog', { name: '搜索文章' })
-  const input = dialog.getByRole('searchbox')
+  const input = dialog.getByRole('combobox')
   await expect(input).toBeFocused()
   await input.fill('搜索')
   const bounds = await dialog.boundingBox()

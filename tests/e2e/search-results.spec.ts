@@ -2,11 +2,11 @@ import { expect, test, type Page } from '@playwright/test'
 import { article, deferSearch, respond, searchResponse } from './search-fixtures'
 
 const firstPage = Array.from({ length: 10 }, (_, index) => article(index + 1))
-const results = (page: Page) => page.getByRole('list', { name: '搜索结果' })
+const results = (page: Page) => page.getByRole('listbox', { name: '搜索结果' })
 
 async function search(page: Page, keyword = '权限') {
-  await page.getByRole('searchbox').fill(keyword)
-  await page.getByRole('searchbox').press('Enter')
+  await page.getByRole('combobox').fill(keyword)
+  await page.getByRole('combobox').press('Enter')
 }
 
 test.beforeEach(async ({ page }) => {
@@ -29,7 +29,7 @@ test('renders titles, excerpts and metadata with all matching keywords highlight
   ]) }))
   await search(page, 'react')
   const list = results(page)
-  await expect(list.getByRole('listitem')).toHaveCount(2)
+  await expect(list.getByRole('option')).toHaveCount(2)
   await expect(list.getByRole('heading', { name: 'React 与 REACT' })).toBeVisible()
   await expect(list.locator('mark')).toHaveText(['React', 'REACT', 'React', 'react'])
   await expect(list).toContainText('开发')
@@ -49,7 +49,7 @@ test('renders HTML-like titles and code excerpts as inert text', async ({ page }
   const list = results(page)
   await expect(list).toContainText('权限说明 <script>alert(1)</script> 与 <img src=x onerror="alert(1)"> 接口权限。')
   await expect(list.locator('mark')).toHaveText(['权限', '权限', '权限'])
-  await expect(list.locator('img, script, a')).toHaveCount(0)
+  await expect(list.locator('img, script, a a')).toHaveCount(0)
   expect(dialogs).toBe(0)
 })
 
@@ -76,8 +76,8 @@ test('retries a failed first page with a button, keeping the keyword', async ({ 
   const retry = page.getByRole('button', { name: '重新搜索', exact: true })
   await expect(retry).toBeVisible()
   await retry.click()
-  await expect(results(page).getByRole('listitem')).toHaveCount(1)
-  await expect(page.getByRole('searchbox')).toHaveValue('权限')
+  await expect(results(page).getByRole('option')).toHaveCount(1)
+  await expect(page.getByRole('combobox')).toHaveValue('权限')
   expect(attempts).toBe(2)
 })
 
@@ -91,7 +91,7 @@ test('appends the next page once and stops at the last page', async ({ page }) =
   await deferSearch(page)
   await search(page)
   await respond(page, 0, searchResponse(firstPage, 12))
-  await expect(results(page).getByRole('listitem')).toHaveCount(10)
+  await expect(results(page).getByRole('option')).toHaveCount(10)
   await page.getByRole('button', { name: '加载更多', exact: true }).click()
   const loading = page.getByRole('button', { name: '加载中…', exact: true })
   await expect(loading).toBeDisabled()
@@ -99,9 +99,9 @@ test('appends the next page once and stops at the last page', async ({ page }) =
   expect(await page.evaluate(() => window.pendingSearches.map(({ keyword, page }) => ({ keyword, page })))).toEqual([
     { keyword: '权限', page: 1 }, { keyword: '权限', page: 2 },
   ])
-  await expect(results(page).getByRole('listitem')).toHaveCount(10)
+  await expect(results(page).getByRole('option')).toHaveCount(10)
   await respond(page, 1, searchResponse([article(11), article(12)], 12, 2))
-  await expect(results(page).getByRole('listitem')).toHaveCount(12)
+  await expect(results(page).getByRole('option')).toHaveCount(12)
   await expect(results(page).getByRole('heading').last()).toHaveText('权限文章 12')
   await expect(page.getByRole('button', { name: '加载更多', exact: true })).toHaveCount(0)
 })
@@ -112,12 +112,12 @@ test('preserves previous results after a page failure and retries that same page
   await respond(page, 0, searchResponse(firstPage, 11))
   await page.getByRole('button', { name: '加载更多', exact: true }).click()
   await respond(page, 1, { code: 5000, message: '服务器错误', data: null })
-  await expect(results(page).getByRole('listitem')).toHaveCount(10)
+  await expect(results(page).getByRole('option')).toHaveCount(10)
   await expect(page.getByRole('alert')).toContainText('加载更多失败')
   await page.getByRole('button', { name: '重试加载', exact: true }).click()
   expect(await page.evaluate(() => window.pendingSearches[2].page)).toBe(2)
   await respond(page, 2, searchResponse([article(11)], 11, 2))
-  await expect(results(page).getByRole('listitem')).toHaveCount(11)
+  await expect(results(page).getByRole('option')).toHaveCount(11)
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
 
@@ -127,7 +127,7 @@ test('deduplicates articles that move between pages while the user is searching'
   await respond(page, 0, searchResponse(firstPage, 11))
   await page.getByRole('button', { name: '加载更多', exact: true }).click()
   await respond(page, 1, searchResponse([article(10), article(11)], 11, 2))
-  await expect(results(page).getByRole('listitem')).toHaveCount(11)
+  await expect(results(page).getByRole('option')).toHaveCount(11)
   await expect(results(page).getByRole('heading', { name: '权限文章 10', exact: true })).toHaveCount(1)
 })
 
@@ -140,7 +140,7 @@ test('ignores an old next-page response after changing the keyword', async ({ pa
   expect(await page.evaluate(() => window.pendingSearches[1].signal?.aborted)).toBe(true)
   await respond(page, 2, searchResponse([article(30, { title: 'React 新文章', excerpt: 'React 介绍' })]))
   await respond(page, 1, searchResponse([article(11)], 11, 2))
-  await expect(results(page).getByRole('listitem')).toHaveCount(1)
+  await expect(results(page).getByRole('option')).toHaveCount(1)
   await expect(results(page).getByRole('heading')).toHaveText('React 新文章')
   await expect(results(page).locator('mark').first()).toHaveText('React')
 })
@@ -155,7 +155,7 @@ for (const action of ['clear', 'close']) {
     expect(await page.evaluate(() => window.pendingSearches[1].signal?.aborted)).toBe(true)
     await respond(page, 1, searchResponse([article(11)], 11, 2))
     if (action === 'close') await page.getByRole('button', { name: '搜索文章', exact: true }).click()
-    await expect(page.getByRole('searchbox')).toHaveValue('')
+    await expect(page.getByRole('combobox')).toHaveValue('')
     await expect(results(page)).toHaveCount(0)
   })
 }
@@ -165,12 +165,12 @@ test('scrolls results inside a short mobile viewport while the input remains vis
   await page.evaluate(() => document.documentElement.classList.add('dark'))
   await page.route('**/api/search?*', route => route.fulfill({ json: searchResponse(firstPage, 11) }))
   await search(page)
-  await expect(results(page).getByRole('listitem')).toHaveCount(10)
+  await expect(results(page).getByRole('option')).toHaveCount(10)
   const region = page.getByRole('region', { name: '搜索内容' })
   const dimensions = await region.evaluate(element => ({ scroll: element.scrollHeight, client: element.clientHeight }))
   expect(dimensions.scroll).toBeGreaterThan(dimensions.client)
   await region.evaluate(element => { element.scrollTop = element.scrollHeight })
-  await expect(page.getByRole('searchbox')).toBeInViewport()
+  await expect(page.getByRole('combobox')).toBeInViewport()
   await expect(page.getByRole('button', { name: '关闭搜索' })).toBeInViewport()
   await expect(page.getByRole('button', { name: '加载更多', exact: true })).toBeInViewport()
   const bounds = await page.getByRole('dialog').boundingBox()
