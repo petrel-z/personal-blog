@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => {
   // These UI tests exercise the real layout without relying on a running database.
   await page.route('**/api/**', async route => {
     const pathname = new URL(route.request().url()).pathname
-    const data = pathname === '/api/posts'
+    const data = pathname === '/api/posts' || pathname === '/api/search'
       ? { items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 }
       : []
     await route.fulfill({ json: { code: 2000, data, message: 'success', timestamp: 0 } })

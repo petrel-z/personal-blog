@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Search, X } from 'lucide-react'
+import { useArticleSearch } from '@/client/hooks/useArticleSearch'
 
 export function SearchDialog() {
   const [open, setOpen] = useState(false)
@@ -76,32 +77,76 @@ export function SearchDialog() {
         >
           <Dialog.Title className="sr-only">搜索文章</Dialog.Title>
           <Dialog.Description className="sr-only">
-            输入搜索关键词，按 Esc 或点击背景关闭搜索。
+            输入关键词后自动搜索，按 Enter 立即搜索，按 Esc 或点击背景关闭搜索。
           </Dialog.Description>
-          <div className="flex items-center gap-3 rounded-xl border border-border px-3 transition-colors focus-within:border-primary">
-            <Search size={20} className="shrink-0 text-text-muted" aria-hidden="true" />
-            <input
-              ref={inputRef}
-              type="search"
-              aria-label="搜索关键词"
-              placeholder="搜索文章..."
-              autoComplete="off"
-              spellCheck={false}
-              className="h-14 min-w-0 flex-1 bg-transparent text-base text-text-main outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
-            />
-            <Dialog.Close asChild>
-              <button
-                type="button"
-                aria-label="关闭搜索"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-sidebar focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <span aria-hidden="true" className="hidden rounded border border-border px-1.5 py-0.5 text-xs sm:block">Esc</span>
-                <X size={18} aria-hidden="true" className="sm:hidden" />
-              </button>
-            </Dialog.Close>
-          </div>
+          <SearchInput inputRef={inputRef} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  )
+}
+
+function SearchInput({ inputRef }: { inputRef: RefObject<HTMLInputElement> }) {
+  const search = useArticleSearch()
+  const statusId = useId()
+  const { state } = search
+  const statusText = state.status === 'success'
+    ? state.data.total > 0 ? `找到 ${state.data.total} 篇相关文章` : '没有找到相关文章，换个关键词试试'
+    : state.status === 'error' ? state.message
+    : state.status === 'loading' ? '正在搜索…'
+    : state.status === 'waiting' ? '输入完成后自动搜索，按 Enter 立即搜索'
+    : '输入关键词搜索文章'
+
+  return (
+    <>
+      <div className="flex items-center gap-1 rounded-xl border border-border px-3 transition-colors focus-within:border-primary sm:gap-3">
+        <Search size={20} className="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="search"
+          aria-label="搜索关键词"
+          aria-describedby={statusId}
+          placeholder="搜索文章..."
+          autoComplete="off"
+          spellCheck={false}
+          value={search.value}
+          onChange={event => search.change(event.currentTarget.value)}
+          onCompositionStart={search.startComposition}
+          onCompositionEnd={event => search.endComposition(event.currentTarget.value)}
+          onKeyDown={event => {
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
+            event.preventDefault()
+            search.submit()
+          }}
+          className="h-14 min-w-0 flex-1 bg-transparent text-base text-text-main outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
+        />
+        {search.value && (
+          <button
+            type="button"
+            aria-label="清空关键词"
+            onClick={() => {
+              search.clear()
+              inputRef.current?.focus({ preventScroll: true })
+            }}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-sidebar focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <span aria-hidden="true" className="text-xs">清空</span>
+          </button>
+        )}
+        <Dialog.Close asChild>
+          <button
+            type="button"
+            aria-label="关闭搜索"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-sidebar focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <span aria-hidden="true" className="hidden rounded border border-border px-1.5 py-0.5 text-xs sm:block">Esc</span>
+            <X size={18} aria-hidden="true" className="sm:hidden" />
+          </button>
+        </Dialog.Close>
+      </div>
+      <p id={statusId} role="status" aria-atomic="true" className="px-3 pb-1 pt-3 text-sm text-text-muted">
+        {statusText}
+      </p>
+    </>
   )
 }
