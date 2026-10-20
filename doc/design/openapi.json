@@ -973,7 +973,7 @@
                                       "excerpt": {
                                         "type": "string",
                                         "maxLength": 162,
-                                        "description": "命中位置附近的文本片段，可能包含原文 Markdown，不是高亮 HTML。"
+                                        "description": "Markdown 转为可见文字后截取的命中片段；保留代码正文，移除格式标记、链接目标和原始 HTML 节点。按纯文本展示，不是高亮 HTML。"
                                       },
                                       "coverImage": {
                                         "type": "string",

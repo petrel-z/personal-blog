@@ -1,11 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const result = (total: number) => ({
-  code: 2000,
-  message: 'success',
-  timestamp: 0,
-  data: { items: [], total, page: 1, pageSize: 10, totalPages: Math.ceil(total / 10) },
-})
+import { deferSearch, finishSearch, result } from './search-fixtures'
 
 function trackRequests(page: Page) {
   const requests: URL[] = []
@@ -14,42 +9,6 @@ function trackRequests(page: Page) {
     if (url.pathname === '/api/search') requests.push(url)
   })
   return requests
-}
-
-// Deliberately ignore cancellation at the network boundary to exercise late responses.
-// The real API client, React hook and dialog still run in the browser.
-declare global {
-  interface Window {
-    pendingSearches: {
-      keyword: string
-      signal: AbortSignal | null | undefined
-      resolve: (body: unknown) => void
-    }[]
-  }
-}
-
-async function deferSearch(page: Page) {
-  await page.evaluate(() => {
-    const originalFetch = window.fetch
-    window.pendingSearches = []
-    window.fetch = (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : String(input), location.origin)
-      if (url.pathname !== '/api/search') return originalFetch(input, init)
-      return new Promise<Response>(resolve => {
-        window.pendingSearches.push({
-          keyword: url.searchParams.get('keyword')!,
-          signal: init?.signal,
-          resolve: body => resolve(Response.json(body)),
-        })
-      })
-    }
-  })
-}
-
-async function finishSearch(page: Page, index: number, total: number) {
-  await page.evaluate(({ index, body }) => window.pendingSearches[index].resolve(body), {
-    index, body: result(total),
-  })
 }
 
 test.beforeEach(async ({ page }) => {

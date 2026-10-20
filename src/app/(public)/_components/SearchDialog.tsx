@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Search, X } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useArticleSearch } from '@/client/hooks/useArticleSearch'
+
+const SearchResults = dynamic(() => import('./SearchResults').then(module => module.SearchResults), { ssr: false })
 
 export function SearchDialog() {
   const [open, setOpen] = useState(false)
@@ -58,7 +61,7 @@ export function SearchDialog() {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
         <Dialog.Content
-          className="fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[70] w-[calc(100%_-_2rem)] max-w-2xl -translate-x-1/2 rounded-2xl border border-border bg-background p-2 text-text-main shadow-2xl outline-none ring-4 ring-background sm:top-[10vh]"
+          className="fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[70] flex max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl -translate-x-1/2 flex-col rounded-2xl border border-border bg-background p-2 text-text-main shadow-2xl outline-none ring-4 ring-background sm:top-[10vh] sm:max-h-[80dvh]"
           onOpenAutoFocus={event => {
             event.preventDefault()
             inputRef.current?.focus({ preventScroll: true })
@@ -99,7 +102,7 @@ function SearchInput({ inputRef }: { inputRef: RefObject<HTMLInputElement> }) {
 
   return (
     <>
-      <div className="flex items-center gap-1 rounded-xl border border-border px-3 transition-colors focus-within:border-primary sm:gap-3">
+      <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border px-3 transition-colors focus-within:border-primary sm:gap-3">
         <Search size={20} className="shrink-0 text-text-muted" aria-hidden="true" />
         <input
           ref={inputRef}
@@ -144,9 +147,10 @@ function SearchInput({ inputRef }: { inputRef: RefObject<HTMLInputElement> }) {
           </button>
         </Dialog.Close>
       </div>
-      <p id={statusId} role="status" aria-atomic="true" className="px-3 pb-1 pt-3 text-sm text-text-muted">
+      <p id={statusId} role="status" aria-atomic="true" className="shrink-0 px-3 pb-1 pt-3 text-sm text-text-muted">
         {statusText}
       </p>
+      <SearchResults state={state} onRetry={search.submit} onLoadMore={search.loadMore} />
     </>
   )
 }

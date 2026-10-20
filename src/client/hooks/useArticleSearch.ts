@@ -5,10 +5,17 @@ import { api, ApiCode } from '@/client/api/fetch'
 import type { PaginatedData } from '@/lib/api-response'
 import type { SearchResultItem } from '@/shared/types/search'
 
-type SearchState =
+interface SearchSuccess {
+  status: 'success'
+  keyword: string
+  data: PaginatedData<SearchResultItem>
+  moreStatus: 'idle' | 'loading' | 'error'
+}
+
+export type SearchState =
   | { status: 'idle' | 'waiting' | 'loading' }
-  | { status: 'success'; keyword: string; data: PaginatedData<SearchResultItem> }
-  | { status: 'error'; message: string }
+  | SearchSuccess
+  | { status: 'error'; message: string; retryable: boolean }
 
 const SEARCH_DELAY = 500
 const MAX_KEYWORD_LENGTH = 100
@@ -37,33 +44,47 @@ export function useArticleSearch() {
   // Mount this hook inside the dialog content so closing also resets its state.
   useEffect(() => cancelPending, [cancelPending])
 
-  const search = useCallback(async (keyword: string) => {
-    if (submittedKeywordRef.current === keyword) return
+  const search = useCallback(async (keyword: string, previous?: SearchSuccess) => {
+    if (previous ? controllerRef.current !== null : submittedKeywordRef.current === keyword) return
     cancelPending()
     submittedKeywordRef.current = keyword
     const controller = new AbortController()
     controllerRef.current = controller
     const requestId = requestIdRef.current
     const isCurrent = () => !controller.signal.aborted && requestId === requestIdRef.current
-    setState({ status: 'loading' })
+    const page = previous ? previous.data.page + 1 : 1
+    setState(previous ? { ...previous, moreStatus: 'loading' } : { status: 'loading' })
 
     try {
       const response = await api.get<SearchResultItem>('/search', {
-        keyword, page: 1, pageSize: 10,
+        keyword, page, pageSize: 10,
       }, { signal: controller.signal })
       if (!isCurrent()) return
 
       const data = response.data
       if (
         response.code !== ApiCode.SUCCESS || !data || !('items' in data) ||
-        !Array.isArray(data.items) || !Number.isSafeInteger(data.total) || data.total < 0
+        !Array.isArray(data.items) || !Number.isSafeInteger(data.total) || data.total < 0 ||
+        data.page !== page || data.pageSize !== 10 || data.totalPages !== Math.ceil(data.total / 10)
       ) throw new Error('Invalid search response')
 
-      setState({ status: 'success', keyword, data })
+      const items = previous ? [...previous.data.items] : []
+      const seen = new Set(items.map(item => item.id))
+      for (const item of data.items) {
+        if (!seen.has(item.id)) {
+          items.push(item)
+          seen.add(item.id)
+        }
+      }
+      setState({ status: 'success', keyword, data: { ...data, items }, moreStatus: 'idle' })
     } catch {
       if (!isCurrent()) return
-      submittedKeywordRef.current = null
-      setState({ status: 'error', message: '搜索失败，请稍后按 Enter 重试' })
+      if (previous) {
+        setState({ ...previous, moreStatus: 'error' })
+      } else {
+        submittedKeywordRef.current = null
+        setState({ status: 'error', message: '搜索失败，请稍后按 Enter 重试', retryable: true })
+      }
     } finally {
       if (isCurrent()) controllerRef.current = null
     }
@@ -75,7 +96,7 @@ export function useArticleSearch() {
       return false
     }
     if (keyword.length > MAX_KEYWORD_LENGTH) {
-      setState({ status: 'error', message: '关键词最多为 100 个字符' })
+      setState({ status: 'error', message: '关键词最多为 100 个字符', retryable: false })
       return false
     }
     return true
@@ -128,5 +149,10 @@ export function useArticleSearch() {
     setState({ status: 'idle' })
   }, [cancelPending])
 
-  return { value, state, change, submit, startComposition, endComposition, clear }
+  const loadMore = useCallback(() => {
+    if (state.status !== 'success' || state.data.page >= state.data.totalPages) return
+    void search(state.keyword, state)
+  }, [search, state])
+
+  return { value, state, change, submit, startComposition, endComposition, clear, loadMore }
 }

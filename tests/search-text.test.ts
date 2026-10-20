@@ -47,3 +47,22 @@ test('does not split supplementary Unicode characters at the excerpt boundary', 
 test('handles an empty article without manufacturing content', () => {
   expect(createSearchExcerpt(null, '', '标题')).toBe('')
 })
+
+test('removes Markdown before truncation so long link URLs cannot consume the excerpt', () => {
+  const content = '## **权限**说明\n\n[接口权限](https://example.com/' + 'a'.repeat(300) +
+    ') 与 `权限`。\n\n```ts\nconst value = "权限";\n```\n\n![示意图](https://example.com/image.png)'
+  expect(createSearchExcerpt(null, content, '权限')).toBe('权限说明 接口权限 与 权限。 const value = "权限"; 示意图')
+})
+
+test('ignores raw HTML and keeps decoded text, image labels and inline formatting', () => {
+  const content = '权**限**与 <b>接口</b> &amp; 配置\n\n![流程图](https://example.com/a.png)\n\n<script>alert(1)</script>'
+  expect(createSearchExcerpt(null, content, '权限')).toBe('权限与 接口 & 配置 流程图')
+})
+
+test('preserves literal code while removing code fences from a deep body match', () => {
+  const content = '简介\n\n'.repeat(100) + '```cpp\nC++ <script> is code;\n```'
+  const excerpt = createSearchExcerpt(null, content, 'C++')
+  expect(excerpt).toContain('C++ <script> is code;')
+  expect(excerpt).not.toContain('```')
+  expect(excerpt).not.toContain('cpp')
+})
