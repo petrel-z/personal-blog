@@ -675,7 +675,7 @@ Cache-Control: public, max-age=600
 
 #### 2.6.1 搜索文章
 
-**接口描述：** 全文搜索文章（标题 + 内容）
+**接口描述：** 在已发布且未删除的文章标题、摘要、正文和未删除的标签名称中进行关键词包含匹配。接口公开，无需登录，调用者的角色及 `scope`、`status` 参数均不会扩大查询范围。
 
 **请求方式：** `GET /search`
 
@@ -683,9 +683,18 @@ Cache-Control: public, max-age=600
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `keyword` | String | 是 | 搜索关键词 |
-| `page` | Number | 否 | 页码 |
-| `pageSize` | Number | 否 | 每页数量 |
+| `keyword` | String | 是 | 去除首尾空白后长度为 1–100 的搜索关键词 |
+| `page` | Number | 否 | 正整数，默认 1；偏移量不得超过 2147483647 |
+| `pageSize` | Number | 否 | 正整数，默认 10，最大 20 |
+
+实际请求示例：`GET /api/search?keyword=Next.js&page=1&pageSize=10`。
+
+- 查询覆盖全部符合条件的文章，由数据库分页，按发布时间、文章 ID 倒序排列。
+- `%`、`_` 和反斜杠按字面值匹配，使用 Prisma 参数化查询。英文大小写遵循数据库排序规则；当前文章字段为 `utf8mb4_unicode_ci`。
+- `excerpt` 优先选择包含关键词的摘要，否则截取正文命中位置附近的文本；仅标题或标签命中时回退到摘要或正文开头。最多 160 个 Unicode 字符，另可附带首尾省略号。
+- `excerpt` 是文本字符串，可能包含原文 Markdown 标记，不生成高亮 HTML；前台应按文本处理，格式整理和关键词高亮属于后续展示功能。
+- 不返回完整正文、作者资料或已删除分类和标签。响应使用 `Cache-Control: no-store`，避免文章下架后复用旧搜索结果。
+- 空关键词、过长关键词、非法页码或分页大小返回 HTTP 400 / `code: 4000`，不会执行数据库查询；数据库异常返回 HTTP 500 / `code: 5000`。
 
 **响应示例：**
 
@@ -699,9 +708,11 @@ Cache-Control: public, max-age=600
         "id": "cm123456789",
         "title": "Next.js 14 最佳实践",
         "slug": "nextjs-14-best-practices",
-        "summary": "本文介绍了 Next.js 14 的核心特性...",
-        "highlight": "<em>Next.js</em> 14 <em>最佳实践</em>",
-        "publishedAt": "2026-02-26T10:00:00Z"
+        "excerpt": "本文介绍了 Next.js 14 的核心特性…",
+        "coverImage": null,
+        "publishedAt": "2026-02-26T10:00:00.000Z",
+        "category": { "id": "category1", "name": "开发", "slug": "dev" },
+        "tags": [{ "id": "tag1", "name": "Next.js", "slug": "nextjs" }]
       }
     ],
     "total": 5,

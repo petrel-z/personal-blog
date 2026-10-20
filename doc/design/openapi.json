@@ -886,32 +886,42 @@
     },
     "/search": {
       "get": {
-        "tags": ["前台-搜索"],
+        "tags": [
+          "前台-搜索"
+        ],
         "summary": "搜索文章",
-        "description": "全文搜索文章",
+        "description": "公开搜索已发布且未删除文章的标题、摘要、正文和未删除标签，采用关键词包含匹配。按发布时间及文章 ID 倒序分页。只返回结果片段，不返回完整正文；响应不缓存。",
         "parameters": [
           {
             "name": "keyword",
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "description": "去除首尾空白后不能为空；SQL 通配符按字面值匹配。"
           },
           {
             "name": "page",
             "in": "query",
             "schema": {
               "type": "integer",
-              "default": 1
-            }
+              "default": 1,
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "description": "页码必须为正整数，(page - 1) * pageSize 不得超过 2147483647。"
           },
           {
             "name": "pageSize",
             "in": "query",
             "schema": {
               "type": "integer",
-              "default": 10
+              "default": 10,
+              "minimum": 1,
+              "maximum": 20
             }
           }
         ],
@@ -929,7 +939,99 @@
                       "type": "object",
                       "properties": {
                         "data": {
-                          "$ref": "#/components/schemas/PaginatedResponse"
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/PaginatedResponse"
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "title",
+                                      "slug",
+                                      "excerpt",
+                                      "coverImage",
+                                      "publishedAt",
+                                      "category",
+                                      "tags"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "slug": {
+                                        "type": "string"
+                                      },
+                                      "excerpt": {
+                                        "type": "string",
+                                        "maxLength": 162,
+                                        "description": "命中位置附近的文本片段，可能包含原文 Markdown，不是高亮 HTML。"
+                                      },
+                                      "coverImage": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "publishedAt": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true
+                                      },
+                                      "category": {
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "name",
+                                          "slug"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "slug": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "nullable": true
+                                      },
+                                      "tags": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "name",
+                                            "slug"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string"
+                                            },
+                                            "name": {
+                                              "type": "string"
+                                            },
+                                            "slug": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
                         }
                       }
                     }
@@ -937,8 +1039,15 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "参数无效，包括空关键词、长度超过限制或非法分页参数；code 为 4000。"
+          },
+          "500": {
+            "description": "搜索服务异常；code 为 5000，不暴露数据库错误详情。"
           }
-        }
+        },
+        "security": []
       }
     },
     "/auth/login": {
