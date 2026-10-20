@@ -5,10 +5,11 @@ import React, {
   useCallback,
   useContext,
   useEffect,
-  useState,
 } from 'react'
 import { useSession, signOut as nextAuthSignOut } from 'next-auth/react'
-import type { Session } from 'next-auth'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { canAccessAdminPage, type Permission } from '@/shared/permissions'
 
 interface AuthContextType {
   user: {
@@ -19,6 +20,8 @@ interface AuthContextType {
   } | null
   isLoading: boolean
   isAuthenticated: boolean
+  can: (permission: Permission) => boolean
+  permissions: readonly Permission[]
   signOut: (callbackUrl?: string) => Promise<void>
 }
 
@@ -26,10 +29,14 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   isAuthenticated: false,
+  can: () => false,
+  permissions: [],
   signOut: async () => {},
 })
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children, permissions }: { children: React.ReactNode; permissions: readonly Permission[] }) {
+  const pathname = usePathname()
+  const can = useCallback((permission: Permission) => permissions.includes(permission), [permissions])
   const { data: session, status } = useSession()
 
   const isAuthenticated = status === 'authenticated' && !!session?.user
@@ -46,6 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: session?.user as AuthContextType['user'],
     isLoading,
     isAuthenticated,
+    can,
+    permissions,
     signOut,
   }
 
@@ -57,6 +66,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           <span className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">加载中...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated || !canAccessAdminPage(permissions, pathname)) {
+    const firstAllowed = permissions.includes('post:read') ? '/admin/posts'
+      : permissions.includes('comment:read') ? '/admin/comments' : '/'
+    return (
+      <div className="p-8 space-y-4">
+        <p>此账号没有访问该页面的权限。</p>
+        <Link href={isAuthenticated ? firstAllowed : '/login'} className="text-primary hover:underline">
+          {isAuthenticated ? '返回可访问的页面' : '重新登录'}
+        </Link>
       </div>
     )
   }

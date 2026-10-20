@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { api } from '@/client/api'
+import { PermissionGate } from '../../../_components/PermissionGate'
 import { useAuth } from '../../../_components'
 import { useToast } from '@/components/ui/toaster'
 import { Upload, Image as ImageIcon, FileText, X, Plus, Search } from 'lucide-react'
@@ -283,7 +284,7 @@ export default function NewPostPage() {
               </div>
 
               {/* Create New Tag */}
-              <div className="border-t pt-4">
+              <PermissionGate permission="tag:manage"><div className="border-t pt-4">
                 <label className="block text-sm font-medium mb-2">创建新标签</label>
                 <div className="flex gap-2">
                   <input
@@ -302,7 +303,7 @@ export default function NewPostPage() {
                     创建
                   </button>
                 </div>
-              </div>
+              </div></PermissionGate>
 
               {/* Selected Tags Summary */}
               {formData.tags.length > 0 && (
@@ -320,20 +321,20 @@ export default function NewPostPage() {
       {/* Header */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-6 py-4 lg:left-64">
         <div className="flex items-center justify-end gap-3">
-          <button
+          <PermissionGate permission="post:create"><button
             onClick={() => handleSave(false)}
             disabled={isSaving}
             className="px-4 py-2 text-sm border rounded-lg hover:bg-accent disabled:opacity-50 transition-colors"
           >
             保存草稿
-          </button>
-          <button
+          </button></PermissionGate>
+          <PermissionGate permission="post:publish"><button
             onClick={() => handleSave(true)}
             disabled={isSaving}
             className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {isSaving ? '发布中...' : '发布'}
-          </button>
+          </button></PermissionGate>
         </div>
       </div>
 

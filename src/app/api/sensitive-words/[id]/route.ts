@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Sensitive Word Detail API Routes
  * PUT /api/sensitive-words/[id]
@@ -16,7 +19,7 @@ const updateSensitiveWordSchema = z.object({
 })
 
 // PUT /api/sensitive-words/[id]
-export async function PUT(
+export const PUT = withPermission('sensitive-word:manage', async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -36,10 +39,10 @@ export async function PUT(
     console.error('Failed to update sensitive word:', error)
     return NextResponse.json(errors.serverError('更新敏感词失败'))
   }
-}
+})
 
 // DELETE /api/sensitive-words/[id]
-export async function DELETE(
+export const DELETE = withPermission('sensitive-word:manage', async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -51,4 +54,4 @@ export async function DELETE(
     console.error('Failed to delete sensitive word:', error)
     return NextResponse.json(errors.serverError('删除敏感词失败'))
   }
-}
+})

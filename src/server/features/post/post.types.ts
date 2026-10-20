@@ -29,6 +29,7 @@ export interface UpdatePostInput {
 }
 
 export interface PostListParams {
+  admin?: boolean
   page?: number
   pageSize?: number
   status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'DELETED' | null

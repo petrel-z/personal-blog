@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { useAuth } from "./AuthProvider";
+import { canAccessAdminPage } from "@/shared/permissions";
 
 interface NavItem {
   href: string;
@@ -248,7 +249,7 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
 
   return (
     <>
@@ -313,7 +314,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4 px-2">
             <div className="space-y-1">
-              {navItems.map((item) => {
+              {navItems.filter(item => canAccessAdminPage(permissions, item.href)).map((item) => {
                 const isActive =
                   pathname === item.href ||
                   pathname.startsWith(item.href + "/");

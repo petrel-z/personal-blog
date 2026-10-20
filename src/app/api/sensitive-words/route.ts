@@ -1,3 +1,4 @@
+import { withPermission } from '@/server/auth/route'
 /**
  * Sensitive Words API Routes
  */
@@ -16,7 +17,7 @@ const createSensitiveWordSchema = z.object({
 })
 
 // GET /api/sensitive-words
-export async function GET(request: Request) {
+export const GET = withPermission('sensitive-word:manage', async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const page = Number(searchParams.get('page')) || 1
@@ -32,10 +33,10 @@ export async function GET(request: Request) {
     console.error('Failed to fetch sensitive words:', error)
     return NextResponse.json(errors.serverError('获取敏感词列表失败'))
   }
-}
+})
 
 // POST /api/sensitive-words
-export async function POST(request: Request) {
+export const POST = withPermission('sensitive-word:manage', async function POST(request: Request) {
   try {
     const body = await request.json()
     const validated = createSensitiveWordSchema.safeParse(body)
@@ -55,4 +56,4 @@ export async function POST(request: Request) {
     console.error('Failed to create sensitive word:', error)
     return NextResponse.json(errors.serverError('创建敏感词失败'))
   }
-}
+})

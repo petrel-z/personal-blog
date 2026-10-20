@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Comment Detail API Routes
  * GET /api/comments/[id] - 获取单条评论
@@ -7,12 +10,12 @@
 import { NextResponse } from 'next/server'
 import { deleteComment } from '@/server/features/comment'
 import { prisma } from '@/server/db'
-import { auth } from '@/auth'
+import type { Actor } from '@/server/auth/access'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 import { success, errors } from '@/lib/api-response'
 
  // GET /api/comments/[id]
-export async function GET(
+export const GET = withPermission('comment:read', async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -39,15 +42,15 @@ export async function GET(
     console.error('Failed to fetch comment:', error)
     return NextResponse.json(errors.serverError('获取评论失败'))
   }
-}
+})
 
 // DELETE /api/comments/[id]
-export async function DELETE(
+export const DELETE = withPermission('comment:delete', async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
+  actor: Actor
 ) {
   try {
-    const session = await auth()
 
     // Get comment info before delete for audit log
     const comment = await prisma.comment.findUnique({
@@ -58,8 +61,8 @@ export async function DELETE(
     await deleteComment(params.id)
 
     // Create audit log
-    if (session?.user?.id && comment) {
-      await logAdminActionWithRequest(session.user.id, {
+    if (comment) {
+      await logAdminActionWithRequest(actor.id, {
         action: AuditAction.COMMENT_DELETE,
         target: `评论: ${comment.nickname}`,
         details: `删除评论: ${comment.content?.slice(0, 50)}...`,
@@ -71,4 +74,4 @@ export async function DELETE(
     console.error('Failed to delete comment:', error)
     return NextResponse.json(errors.serverError(error instanceof Error ? error.message : '删除评论失败'))
   }
-}
+})

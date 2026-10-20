@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Users API Route - Admin user management
  */
@@ -7,7 +10,7 @@ import { prisma } from '@/server/db'
 import { success, errors } from '@/lib/api-response'
 
 // GET /api/auth/users - List all users
-export async function GET() {
+export const GET = withPermission('user:read', async function GET() {
   try {
     const users = await prisma.user.findMany({
       where: {
@@ -36,4 +39,4 @@ export async function GET() {
     console.error('Failed to fetch users:', error)
     return NextResponse.json(errors.serverError('获取用户列表失败'))
   }
-}
+})

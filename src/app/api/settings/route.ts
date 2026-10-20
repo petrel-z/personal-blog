@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Settings API Routes
  */
@@ -39,7 +42,7 @@ export async function GET() {
 
 // PUT /api/settings
 // Body: SiteSettings object
-export async function PUT(request: Request) {
+export const PUT = withPermission('settings:update', async function PUT(request: Request) {
   try {
     const body = await request.json()
     const validated = updateSettingsSchema.safeParse(body)
@@ -64,4 +67,4 @@ export async function PUT(request: Request) {
     console.error('Failed to update settings:', error)
     return NextResponse.json(errors.serverError('更新设置失败'))
   }
-}
+})

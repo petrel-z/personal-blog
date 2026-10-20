@@ -1,3 +1,4 @@
+import { withPermission } from '@/server/auth/route'
 /**
  * Upload API Routes
  * 处理文件上传，支持本地存储和阿里云 OSS
@@ -17,7 +18,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 
 // POST /api/upload
-export async function POST(request: Request) {
+export const POST = withPermission('upload:create', async function POST(request: Request) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -120,4 +121,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-}
+})

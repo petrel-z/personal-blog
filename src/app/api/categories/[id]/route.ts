@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Category Detail API Routes
  * GET /api/categories/[id]
@@ -40,7 +43,7 @@ export async function GET(
 }
 
 // PUT /api/categories/[id]
-export async function PUT(
+export const PUT = withPermission('category:manage', async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -61,10 +64,10 @@ export async function PUT(
     console.error('Failed to update category:', error)
     return NextResponse.json(errors.serverError('更新分类失败'))
   }
-}
+})
 
 // DELETE /api/categories/[id]
-export async function DELETE(
+export const DELETE = withPermission('category:manage', async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -78,4 +81,4 @@ export async function DELETE(
       errors.serverError(error instanceof Error ? error.message : '删除分类失败')
     )
   }
-}
+})
