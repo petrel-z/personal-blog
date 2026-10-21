@@ -15,10 +15,11 @@ function HighlightedText({ text, keyword }: { text: string; keyword: string }) {
 
 const actionClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm text-text-main transition-colors hover:bg-sidebar focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60'
 
-export function SearchResults({ state, listId, activeId, onRetry, onLoadMore, onNavigate }: {
+export function SearchResults({ state, listId, activeId, retryAfter, onRetry, onLoadMore, onNavigate }: {
   state: SearchState
   listId: string
   activeId?: string
+  retryAfter: number
   onRetry: () => void
   onLoadMore: () => void
   onNavigate: () => void
@@ -57,8 +58,12 @@ export function SearchResults({ state, listId, activeId, onRetry, onLoadMore, on
           </div>)}
         </div>
       )}
-      {state.status === 'error' && (
-        <div className="px-3 py-4"><button type="button" className={actionClass} onClick={onRetry}>重新搜索</button></div>
+      {(state.status === 'error' || state.status === 'rateLimited') && (
+        <div className="px-3 py-4">
+          <button type="button" className={actionClass} onClick={onRetry} disabled={retryAfter > 0}>
+            {retryAfter > 0 ? `${retryAfter} 秒后重试` : '重新搜索'}
+          </button>
+        </div>
       )}
       {state.status === 'success' && (
         state.data.items.length === 0
@@ -109,10 +114,14 @@ export function SearchResults({ state, listId, activeId, onRetry, onLoadMore, on
             </ul>
             <div className="border-t border-border px-3 py-3 text-center">
               {state.moreStatus === 'error' && <p role="alert" className="mb-2 text-sm text-text-muted">加载更多失败，已显示的文章已保留。</p>}
+              {state.moreStatus === 'rateLimited' && <p role="alert" className="mb-2 text-sm text-text-muted">
+                {retryAfter > 0 ? `搜索过于频繁，请 ${retryAfter} 秒后重试。` : '现在可以继续加载。'}已显示的文章已保留。
+              </p>}
               {state.data.page < state.data.totalPages
-                ? <button type="button" className={actionClass} onClick={onLoadMore} disabled={loading}>
+                ? <button type="button" className={actionClass} onClick={onLoadMore} disabled={loading || retryAfter > 0}>
                   {loading && <Loader2 size={16} aria-hidden="true" className="motion-safe:animate-spin" />}
-                  {loading ? '加载中…' : state.moreStatus === 'error' ? '重试加载' : '加载更多'}
+                  {loading ? '加载中…' : retryAfter > 0 ? `${retryAfter} 秒后重试`
+                    : state.moreStatus === 'error' || state.moreStatus === 'rateLimited' ? '重试加载' : '加载更多'}
                 </button>
                 : <p className="text-xs text-text-muted">没有更多结果</p>}
             </div>

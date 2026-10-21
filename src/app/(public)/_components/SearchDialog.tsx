@@ -119,6 +119,8 @@ function SearchInput({ inputRef, onNavigate }: { inputRef: RefObject<HTMLInputEl
   const hasResults = items.length > 0
   const statusText = state.status === 'success'
     ? state.data.total > 0 ? `找到 ${state.data.total} 篇相关文章` : '没有找到相关文章，换个关键词试试'
+    : state.status === 'rateLimited' ? search.retryAfter > 0
+      ? `搜索过于频繁，请 ${search.retryAfter} 秒后重试` : '现在可以重新搜索'
     : state.status === 'error' ? state.message
     : state.status === 'loading' ? '正在搜索…'
     : state.status === 'waiting' ? '输入完成后自动搜索，按 Enter 立即搜索'
@@ -203,6 +205,7 @@ function SearchInput({ inputRef, onNavigate }: { inputRef: RefObject<HTMLInputEl
       </div>
       <SearchResults
         state={state} listId={resultsId} activeId={activeDescendant}
+        retryAfter={search.retryAfter}
         onRetry={search.submit} onLoadMore={search.loadMore} onNavigate={onNavigate}
       />
     </>

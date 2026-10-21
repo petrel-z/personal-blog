@@ -9,11 +9,11 @@ interface SearchSuccess {
   status: 'success'
   keyword: string
   data: PaginatedData<SearchResultItem>
-  moreStatus: 'idle' | 'loading' | 'error'
+  moreStatus: 'idle' | 'loading' | 'error' | 'rateLimited'
 }
 
 export type SearchState =
-  | { status: 'idle' | 'waiting' | 'loading' }
+  | { status: 'idle' | 'waiting' | 'loading' | 'rateLimited' }
   | SearchSuccess
   | { status: 'error'; message: string; retryable: boolean }
 
@@ -30,6 +30,19 @@ export function useArticleSearch() {
   const controllerRef = useRef<AbortController | null>(null)
   const requestIdRef = useRef(0)
   const submittedKeywordRef = useRef<string | null>(null)
+  const retryAtRef = useRef(0)
+  const [retryAt, setRetryAt] = useState(0)
+  const [retryAfter, setRetryAfter] = useState(0)
+
+  useEffect(() => {
+    if (!retryAt) return
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((retryAt - Date.now()) / 1000))
+      setRetryAfter(remaining)
+      if (!remaining) clearInterval(timer)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [retryAt])
 
   const cancelPending = useCallback(() => {
     if (timerRef.current !== null) clearTimeout(timerRef.current)
@@ -45,6 +58,10 @@ export function useArticleSearch() {
   useEffect(() => cancelPending, [cancelPending])
 
   const search = useCallback(async (keyword: string, previous?: SearchSuccess) => {
+    if (Date.now() < retryAtRef.current) {
+      setState(previous ? { ...previous, moreStatus: 'rateLimited' } : { status: 'rateLimited' })
+      return
+    }
     if (previous ? controllerRef.current !== null : submittedKeywordRef.current === keyword) return
     cancelPending()
     submittedKeywordRef.current = keyword
@@ -60,6 +77,16 @@ export function useArticleSearch() {
         keyword, page, pageSize: 10,
       }, { signal: controller.signal })
       if (!isCurrent()) return
+
+      if (response.code === ApiCode.RATE_LIMITED) {
+        const seconds = response.retryAfterSeconds ?? 60
+        retryAtRef.current = Date.now() + seconds * 1000
+        setRetryAt(retryAtRef.current)
+        setRetryAfter(seconds)
+        submittedKeywordRef.current = null
+        setState(previous ? { ...previous, moreStatus: 'rateLimited' } : { status: 'rateLimited' })
+        return
+      }
 
       const data = response.data
       if (
@@ -113,6 +140,10 @@ export function useArticleSearch() {
     // Cancel on input, before waiting for the next debounce, to prevent stale results.
     cancelPending()
     if (!validate(keyword)) return
+    if (Date.now() < retryAtRef.current) {
+      setState({ status: 'rateLimited' })
+      return
+    }
     setState({ status: 'waiting' })
     timerRef.current = setTimeout(() => {
       timerRef.current = null
@@ -125,8 +156,12 @@ export function useArticleSearch() {
     if (timerRef.current !== null) clearTimeout(timerRef.current)
     timerRef.current = null
     const keyword = valueRef.current.trim()
+    if (state.status === 'success' && state.keyword === keyword && state.moreStatus === 'rateLimited') {
+      void search(keyword, state)
+      return
+    }
     if (validate(keyword)) void search(keyword)
-  }, [search, validate])
+  }, [search, validate, state])
 
   const startComposition = useCallback(() => {
     composingRef.current = true
@@ -154,5 +189,5 @@ export function useArticleSearch() {
     void search(state.keyword, state)
   }, [search, state])
 
-  return { value, state, change, submit, startComposition, endComposition, clear, loadMore }
+  return { value, state, retryAfter, change, submit, startComposition, endComposition, clear, loadMore }
 }
