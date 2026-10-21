@@ -104,12 +104,11 @@ end
 │   ├── app/                        # Next.js App Router (页面入口 + 路由)
 │   │   │
 │   │   ├── (public)/               # 前台路由组 (访客端)
-│   │   │   ├── _components/        # 前台专用组件
+│   │   │   ├── _components/        # 前台专用组件（含 SearchDialog 搜索浮层）
 │   │   │   ├── layout.tsx          # 前台布局
 │   │   │   ├── page.tsx            # 首页
 │   │   │   ├── post/[slug]/        # 文章详情
 │   │   │   ├── category/[slug]/    # 分类列表
-│   │   │   ├── search/             # 搜索页
 │   │   │   ├── trending/           # 热度排行榜
 │   │   │   ├── archive/            # 创作记录
 │   │   │   └── about/              # 关于我
