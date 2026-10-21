@@ -47,3 +47,5 @@ coverage
 
 # doc
 doc
+doc/design
+doc/dev
