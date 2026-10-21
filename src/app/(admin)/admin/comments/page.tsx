@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { api } from '@/client/api'
+import { PermissionGate } from '../../_components/PermissionGate'
 import { useAuth } from '../../_components'
 import type { CommentWithReplies, PostWithRelations } from '@/shared/types'
 
@@ -187,18 +188,18 @@ export default function CommentsPage() {
         {/* Batch Actions */}
         {selectedComments.size > 0 && (
           <div className="flex gap-2">
-            <button
+            <PermissionGate permission="comment:approve"><button
               onClick={handleBatchApprove}
               className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
               批量通过 ({selectedComments.size})
-            </button>
-            <button
+            </button></PermissionGate>
+            <PermissionGate permission="comment:delete"><button
               onClick={handleBatchDelete}
               className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               批量删除
-            </button>
+            </button></PermissionGate>
           </div>
         )}
       </div>
@@ -305,26 +306,26 @@ export default function CommentsPage() {
                   <td className="px-4 py-3 text-right">
                     {comment.status === 'PENDING' && (
                       <>
-                        <button
+                        <PermissionGate permission="comment:approve"><button
                           onClick={() => handleApprove(comment.id)}
                           className="px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded transition-colors"
                         >
                           通过
-                        </button>
-                        <button
+                        </button></PermissionGate>
+                        <PermissionGate permission="comment:reject"><button
                           onClick={() => handleReject(comment.id)}
                           className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
                         >
                           拒绝
-                        </button>
+                        </button></PermissionGate>
                       </>
                     )}
-                    <button
+                    <PermissionGate permission="comment:delete"><button
                       onClick={() => handleDelete(comment.id)}
                       className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
                     >
                       删除
-                    </button>
+                    </button></PermissionGate>
                   </td>
                 </tr>
               ))

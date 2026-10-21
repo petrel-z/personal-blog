@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Tags API Routes
  */
@@ -33,7 +36,7 @@ export async function GET() {
 }
 
 // POST /api/tags
-export async function POST(request: Request) {
+export const POST = withPermission('tag:manage', async function POST(request: Request) {
   try {
     const body = await request.json()
     const validated = createTagSchema.safeParse(body)
@@ -51,4 +54,4 @@ export async function POST(request: Request) {
     console.error('Failed to create tag:', error)
     return NextResponse.json(errors.serverError('创建标签失败'))
   }
-}
+})

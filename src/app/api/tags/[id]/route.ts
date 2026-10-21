@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Tag Detail API Routes
  * PUT /api/tags/[id]
@@ -15,7 +18,7 @@ const updateTagSchema = z.object({
 })
 
 // PUT /api/tags/[id]
-export async function PUT(
+export const PUT = withPermission('tag:manage', async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -36,10 +39,10 @@ export async function PUT(
     console.error('Failed to update tag:', error)
     return NextResponse.json(errors.serverError('更新标签失败'))
   }
-}
+})
 
 // DELETE /api/tags/[id]
-export async function DELETE(
+export const DELETE = withPermission('tag:manage', async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -51,4 +54,4 @@ export async function DELETE(
     console.error('Failed to delete tag:', error)
     return NextResponse.json(errors.serverError('删除标签失败'))
   }
-}
+})

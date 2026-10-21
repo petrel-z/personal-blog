@@ -104,12 +104,11 @@ end
 │   ├── app/                        # Next.js App Router (页面入口 + 路由)
 │   │   │
 │   │   ├── (public)/               # 前台路由组 (访客端)
-│   │   │   ├── _components/        # 前台专用组件
+│   │   │   ├── _components/        # 前台专用组件（含 SearchDialog 搜索浮层）
 │   │   │   ├── layout.tsx          # 前台布局
 │   │   │   ├── page.tsx            # 首页
 │   │   │   ├── post/[slug]/        # 文章详情
 │   │   │   ├── category/[slug]/    # 分类列表
-│   │   │   ├── search/             # 搜索页
 │   │   │   ├── trending/           # 热度排行榜
 │   │   │   ├── archive/            # 创作记录
 │   │   │   └── about/              # 关于我
@@ -834,7 +833,7 @@ Redis 计数定期同步到 MySQL：
 - **Rate Limiting**:
   - 评论接口：1 分钟 1 条/IP
   - 登录接口：5 次失败/15 分钟
-  - 搜索接口：10 次/分钟/IP
+  - 搜索接口：60 次/分钟/IP
 - **输入验证**:
   - 使用 Zod 验证所有输入
   - 严格类型转换

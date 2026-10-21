@@ -1,3 +1,5 @@
+import { withPermission, accessErrorResponse } from '@/server/auth/route'
+import { requirePermission } from '@/server/auth/access'
 /**
  * Posts API Routes
  * 只负责：解析参数、调用业务逻辑、返回响应
@@ -6,7 +8,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getPosts, createPost } from '@/server/features/post'
-import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 import { success, created, errors, paginated } from '@/lib/api-response'
 
@@ -34,28 +35,33 @@ export async function GET(request: Request) {
     const status = searchParams.get('status') as 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'all' | null
     const categoryId = searchParams.get('categoryId') || undefined
     const tagSlug = searchParams.get('tagSlug') || undefined
+    const admin = searchParams.get('scope') === 'admin' || (!!status && status !== 'PUBLISHED')
+    const actor = admin ? await requirePermission('post:read') : undefined
 
     const result = await getPosts({
+      admin,
       page,
       pageSize,
       status: status === 'all' ? undefined : status || undefined,
       categoryId,
       tagSlug,
-    })
+    }, actor)
 
     return NextResponse.json(
-      paginated(result.posts, result.total, result.page, result.pageSize)
+      paginated(result.posts, result.total, result.page, result.pageSize),
+      admin ? { headers: { 'Cache-Control': 'private, no-store' } } : undefined,
     )
   } catch (error) {
+    const denied = accessErrorResponse(error)
+    if (denied) return denied
     console.error('Failed to fetch posts:', error)
     return NextResponse.json(errors.serverError('获取文章列表失败'))
   }
 }
 
 // POST /api/posts
-export async function POST(request: Request) {
+export const POST = withPermission('post:create', async function POST(request: Request, _context, actor) {
   try {
-    const session = await auth()
     const body = await request.json()
     const validated = createPostSchema.safeParse(body)
 
@@ -67,18 +73,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check authentication
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        errors.unauthorized('请先登录')
-      )
-    }
-
-    const authorId = session.user.id
-    const post = await createPost(validated.data, authorId)
+    const post = await createPost(validated.data, actor)
 
     // Create audit log
-    await logAdminActionWithRequest(session.user.id, {
+    await logAdminActionWithRequest(actor.id, {
       action: AuditAction.POST_CREATE,
       target: post.title,
       details: `创建文章: ${post.title}`,
@@ -86,6 +84,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(created(post), { status: 201 })
   } catch (error) {
+    const denied = accessErrorResponse(error)
+    if (denied) return denied
     console.error('Failed to create post:', error)
 
     // 处理 Prisma 唯一约束错误
@@ -104,4 +104,4 @@ export async function POST(request: Request) {
 
     return NextResponse.json(errors.serverError('创建文章失败，请稍后重试'))
   }
-}
+})

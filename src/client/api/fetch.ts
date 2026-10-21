@@ -22,6 +22,8 @@ interface ApiResponse<T> {
   message: string
   data: T | null
   timestamp: number
+  /** Present on rate-limited responses; seconds until a retry is permitted. */
+  retryAfterSeconds?: number
 }
 
 interface PaginatedResponse<T> {
@@ -35,6 +37,7 @@ interface PaginatedResponse<T> {
     totalPages: number
   }
   timestamp: number
+  retryAfterSeconds?: number
 }
 
 class FetchClient {
@@ -84,11 +87,15 @@ class FetchClient {
 
       // 检查 HTTP 状态码
       if (!response.ok) {
+        const retryAfter = Number(response.headers.get('Retry-After'))
+        const rateLimited = response.status === 429 || result.code === ApiCode.RATE_LIMITED
         return {
-          code: result.code || response.status,
+          code: rateLimited ? ApiCode.RATE_LIMITED : result.code || response.status,
           message: result.message || `请求失败 (${response.status})`,
           data: null,
           timestamp: result.timestamp || Date.now(),
+          ...(rateLimited ? { retryAfterSeconds: Number.isSafeInteger(retryAfter) && retryAfter > 0
+            ? retryAfter : 60 } : {}),
         }
       }
 

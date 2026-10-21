@@ -6,9 +6,9 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { Cloud, Search, Moon, Sun, User, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Cloud, Moon, Sun, User, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { Sidebar } from './_components/Sidebar'
+import { SearchDialog } from './_components/SearchDialog'
 import { cn } from '@/lib/utils'
 
 export default function PublicLayout({
@@ -58,17 +58,7 @@ export default function PublicLayout({
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="flex-1 max-w-md relative group">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary transition-colors">
-              <Search size={14} />
-            </div>
-            <input
-              type="text"
-              placeholder="搜索 (Ctrl + K)"
-              className="w-full bg-sidebar border border-border rounded py-1.5 pl-10 pr-4 text-xs focus:ring-1 focus:ring-primary/20 transition-all outline-none"
-            />
-          </div>
+          <SearchDialog />
 
           {/* Actions */}
           <div className="flex items-center gap-2 sm:gap-4">

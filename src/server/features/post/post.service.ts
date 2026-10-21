@@ -5,17 +5,20 @@
 import { prisma } from '@/server/db'
 import { Prisma } from '@prisma/client'
 import { CreatePostInput, UpdatePostInput, PostListParams } from './post.types'
+import { AccessError, assertPermission, assertPostOwner, type Actor } from '@/server/auth/access'
 
-export async function getPosts(params: PostListParams) {
+export async function getPosts(params: PostListParams, actor?: Actor) {
   const { page = 1, pageSize = 10, status, categoryId, tagSlug } = params
 
   const where: Prisma.PostWhereInput = {
     deletedAt: null,
   }
 
-  // Admin can filter by status, otherwise only show PUBLISHED
-  if (status) {
-    where.status = status
+  const managementQuery = params.admin || (status && status !== 'PUBLISHED')
+  if (managementQuery) {
+    assertPermission(actor, 'post:read')
+    if (!actor.isAdmin) where.authorId = actor.id
+    if (status) where.status = status
   } else {
     where.status = 'PUBLISHED'
   }
@@ -92,7 +95,31 @@ export async function getPostBySlug(slug: string) {
   return post
 }
 
-export async function createPost(data: CreatePostInput, authorId: string) {
+async function resolvePostTags(names: string[], actor: Actor) {
+  if (actor.permissions.includes('tag:manage')) {
+    return {
+      connectOrCreate: names.map(name => ({
+        where: { name },
+        create: { name, slug: name.toLowerCase().replace(/\s+/g, '-') },
+      })),
+    }
+  }
+
+  const existing = await prisma.tag.findMany({
+    where: { name: { in: names }, deletedAt: null },
+    select: { name: true },
+  })
+  const available = new Set(existing.map(tag => tag.name))
+  if (names.some(name => !available.has(name))) {
+    throw new AccessError(403, '创建新标签需要标签管理权限，请选择已有标签')
+  }
+  return { connect: names.map(name => ({ name })) }
+}
+
+export async function createPost(data: CreatePostInput, actor: Actor) {
+  assertPermission(actor, 'post:create')
+  if (data.status === 'PUBLISHED') assertPermission(actor, 'post:publish')
+  const tags = data.tags ? await resolvePostTags(data.tags, actor) : undefined
   // Generate slug from title
   let baseSlug = data.title
     .toLowerCase()
@@ -118,21 +145,11 @@ export async function createPost(data: CreatePostInput, authorId: string) {
       coverImage: data.coverImage,
       status: data.status || 'DRAFT',
       isPinned: data.isPinned || false,
-      authorId,
+      authorId: actor.id,
       categoryId: data.categoryId,
       createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
       publishedAt: data.createdAt && data.status === 'PUBLISHED' ? new Date(data.createdAt) : undefined,
-      tags: data.tags
-        ? {
-            connectOrCreate: data.tags.map((name) => ({
-              where: { name },
-              create: {
-                name,
-                slug: name.toLowerCase().replace(/\s+/g, '-'),
-              },
-            })),
-          }
-        : undefined,
+      tags,
     },
     include: {
       category: true,
@@ -143,25 +160,25 @@ export async function createPost(data: CreatePostInput, authorId: string) {
   return post
 }
 
-export async function updatePost(id: string, data: UpdatePostInput) {
+export async function updatePost(id: string, data: UpdatePostInput, actor: Actor) {
+  assertPermission(actor, 'post:update')
+  const current = await prisma.post.findUnique({
+    where: { id }, select: { authorId: true, status: true, deletedAt: true },
+  })
+  if (!current || current.deletedAt) throw new AccessError(404, '文章不存在')
+  assertPostOwner(actor, current.authorId)
+  if (current.status === 'PUBLISHED' || data.status === 'PUBLISHED') {
+    assertPermission(actor, 'post:publish')
+  }
   const { tags, ...updateData } = data
+  const tagRelations = tags ? await resolvePostTags(tags, actor) : undefined
 
   const post = await prisma.post.update({
-    where: { id },
+    // Recheck the state used for authorization atomically with the write.
+    where: { id, authorId: current.authorId, status: current.status, deletedAt: null },
     data: {
       ...updateData,
-      tags: tags
-        ? {
-            set: [],
-            connectOrCreate: tags.map((name) => ({
-              where: { name },
-              create: {
-                name,
-                slug: name.toLowerCase().replace(/\s+/g, '-'),
-              },
-            })),
-          }
-        : undefined,
+      tags: tagRelations ? { set: [], ...tagRelations } : undefined,
     },
     include: {
       category: true,
@@ -172,9 +189,15 @@ export async function updatePost(id: string, data: UpdatePostInput) {
   return post
 }
 
-export async function deletePost(id: string) {
+export async function deletePost(id: string, actor: Actor) {
+  assertPermission(actor, 'post:delete')
+  const current = await prisma.post.findUnique({
+    where: { id }, select: { authorId: true, deletedAt: true },
+  })
+  if (!current || current.deletedAt) throw new AccessError(404, '文章不存在')
+  assertPostOwner(actor, current.authorId)
   await prisma.post.update({
-    where: { id },
+    where: { id, authorId: current.authorId, deletedAt: null },
     data: {
       status: 'DELETED',
       deletedAt: new Date(),

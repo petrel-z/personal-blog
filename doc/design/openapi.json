@@ -886,32 +886,42 @@
     },
     "/search": {
       "get": {
-        "tags": ["前台-搜索"],
+        "tags": [
+          "前台-搜索"
+        ],
         "summary": "搜索文章",
-        "description": "全文搜索文章",
+        "description": "公开搜索已发布且未删除文章的标题、摘要、正文和未删除标签，采用关键词包含匹配。按发布时间及文章 ID 倒序分页。只返回结果片段，不返回完整正文；响应不缓存。 单进程固定 60 秒窗口内每客户端最多 60 次有效查询（含分页）；默认直连共享额度，可信代理配置启用后按 X-Real-IP 计数。",
         "parameters": [
           {
             "name": "keyword",
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "description": "去除首尾空白后不能为空；SQL 通配符按字面值匹配。"
           },
           {
             "name": "page",
             "in": "query",
             "schema": {
               "type": "integer",
-              "default": 1
-            }
+              "default": 1,
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "description": "页码必须为正整数，(page - 1) * pageSize 不得超过 2147483647。"
           },
           {
             "name": "pageSize",
             "in": "query",
             "schema": {
               "type": "integer",
-              "default": 10
+              "default": 10,
+              "minimum": 1,
+              "maximum": 20
             }
           }
         ],
@@ -929,7 +939,99 @@
                       "type": "object",
                       "properties": {
                         "data": {
-                          "$ref": "#/components/schemas/PaginatedResponse"
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/PaginatedResponse"
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "title",
+                                      "slug",
+                                      "excerpt",
+                                      "coverImage",
+                                      "publishedAt",
+                                      "category",
+                                      "tags"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "slug": {
+                                        "type": "string"
+                                      },
+                                      "excerpt": {
+                                        "type": "string",
+                                        "maxLength": 162,
+                                        "description": "Markdown 转为可见文字后截取的命中片段；保留代码正文，移除格式标记、链接目标和原始 HTML 节点。按纯文本展示，不是高亮 HTML。"
+                                      },
+                                      "coverImage": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "publishedAt": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true
+                                      },
+                                      "category": {
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "name",
+                                          "slug"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "slug": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "nullable": true
+                                      },
+                                      "tags": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "name",
+                                            "slug"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string"
+                                            },
+                                            "name": {
+                                              "type": "string"
+                                            },
+                                            "slug": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
                         }
                       }
                     }
@@ -937,8 +1039,38 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "参数无效，包括空关键词、长度超过限制或非法分页参数；code 为 4000。"
+          },
+          "500": {
+            "description": "搜索服务异常；code 为 5000，不暴露数据库错误详情。"
+          },
+          "429": {
+            "description": "搜索次数超限或限流记录容量已满，未查询数据库；code 为 4290，data 为 null。",
+            "headers": {
+              "Retry-After": {
+                "description": "剩余等待秒数，向上取整；拒绝请求不会延长窗口。",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 4290,
+                  "message": "搜索过于频繁，请稍后重试",
+                  "data": null,
+                  "timestamp": 1707219200000
+                }
+              }
+            }
           }
-        }
+        },
+        "security": []
       }
     },
     "/auth/login": {

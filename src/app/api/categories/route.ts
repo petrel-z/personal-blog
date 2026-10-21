@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { withPermission } from '@/server/auth/route'
 /**
  * Categories API Routes
  */
@@ -29,7 +32,7 @@ export async function GET() {
 }
 
 // POST /api/categories
-export async function POST(request: Request) {
+export const POST = withPermission('category:manage', async function POST(request: Request) {
   try {
     const body = await request.json()
     const validated = createCategorySchema.safeParse(body)
@@ -47,4 +50,4 @@ export async function POST(request: Request) {
     console.error('Failed to create category:', error)
     return NextResponse.json(errors.serverError('创建分类失败'))
   }
-}
+})

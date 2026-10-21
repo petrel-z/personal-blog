@@ -675,7 +675,7 @@ Cache-Control: public, max-age=600
 
 #### 2.6.1 搜索文章
 
-**接口描述：** 全文搜索文章（标题 + 内容）
+**接口描述：** 在已发布且未删除的文章标题、摘要、正文和未删除的标签名称中进行关键词包含匹配。接口公开，无需登录，调用者的角色及 `scope`、`status` 参数均不会扩大查询范围。
 
 **请求方式：** `GET /search`
 
@@ -683,9 +683,23 @@ Cache-Control: public, max-age=600
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `keyword` | String | 是 | 搜索关键词 |
-| `page` | Number | 否 | 页码 |
-| `pageSize` | Number | 否 | 每页数量 |
+| `keyword` | String | 是 | 去除首尾空白后长度为 1–100 的搜索关键词 |
+| `page` | Number | 否 | 正整数，默认 1；偏移量不得超过 2147483647 |
+| `pageSize` | Number | 否 | 正整数，默认 10，最大 20 |
+
+实际请求示例：`GET /api/search?keyword=Next.js&page=1&pageSize=10`。
+
+- 查询覆盖全部符合条件的文章，由数据库分页，按发布时间、文章 ID 倒序排列。
+- `%`、`_` 和反斜杠按字面值匹配，使用 Prisma 参数化查询。英文大小写遵循数据库排序规则；当前文章字段为 `utf8mb4_unicode_ci`。
+- `excerpt` 优先选择包含关键词的摘要，否则截取正文命中位置附近的文本；仅标题或标签命中时回退到摘要或正文开头。最多 160 个 Unicode 字符，另可附带首尾省略号。
+- `excerpt` 在定位关键词和截断之前，先将 Markdown 转为可见文字，保留代码正文及图片说明，移除格式标记、链接目标和原始 HTML 节点。返回纯文本，不生成高亮 HTML；前台使用文本节点展示和高亮，代码中的 `<script>` 等文字也不能当成 HTML 渲染。
+- 不返回完整正文、作者资料或已删除分类和标签。响应使用 `Cache-Control: no-store`，避免文章下架后复用旧搜索结果。
+- 空关键词、过长关键词、非法页码或分页大小返回 HTTP 400 / `code: 4000`，不会执行数据库查询；数据库异常返回 HTTP 500 / `code: 5000`。
+- 搜索限流：每个客户端从首次有效请求开始，固定 60 秒窗口内最多执行 60 次查询，包含分页和数据库失败的请求。无效参数不占用额度。超额返回 HTTP 429 / `code: 4290`、`data: null` 和 `Retry-After` 响应头（剩余等待秒数，向上取整）；不访问数据库，拒绝请求不延长窗口。
+- 当前为单 Node 进程内存限流，最多保存 10,000 个客户端记录，按到期顺序回收；容量满时新客户端也返回 429，不淘汰已有记录来释放额度。进程重启会清空计数，多进程或多实例部署前需迁移至 Redis 等共享存储。
+- 默认 `SEARCH_TRUST_PROXY=false`，所有直接访问共享额度，不信任客户端提交的 IP 请求头。只有入口代理覆盖 `X-Real-IP` 且 Next.js 端口禁止外部直连时，才设置 `SEARCH_TRUST_PROXY=true`：此时按规范化后的 IP 分别计数；IPv6 等价写法及 IPv4 映射地址合并，缺失或非法 IP 使用共享额度，忽略 `X-Forwarded-For`。
+- 单层 Nginx 代理应设置 `proxy_set_header X-Real-IP $remote_addr;`；如入口前还有 CDN，须先由代理根据可信来源配置解析真实客户端 IP，不能直接沿用客户端提供的头。环境变量变更后需重启应用。
+- 前台根据 `Retry-After` 暂停当前浮层的搜索与分页请求并显示倒计时；缺失或无效等待时间按 60 秒处理。清空、换词不会取消等待；到期后由用户主动重试，不自动发请求。分页受限时保留已有结果及文章跳转。关闭浮层会清理本地计时器，重新打开仍由服务端额度约束。
 
 **响应示例：**
 
@@ -699,9 +713,11 @@ Cache-Control: public, max-age=600
         "id": "cm123456789",
         "title": "Next.js 14 最佳实践",
         "slug": "nextjs-14-best-practices",
-        "summary": "本文介绍了 Next.js 14 的核心特性...",
-        "highlight": "<em>Next.js</em> 14 <em>最佳实践</em>",
-        "publishedAt": "2026-02-26T10:00:00Z"
+        "excerpt": "本文介绍了 Next.js 14 的核心特性…",
+        "coverImage": null,
+        "publishedAt": "2026-02-26T10:00:00.000Z",
+        "category": { "id": "category1", "name": "开发", "slug": "dev" },
+        "tags": [{ "id": "tag1", "name": "Next.js", "slug": "nextjs" }]
       }
     ],
     "total": 5,

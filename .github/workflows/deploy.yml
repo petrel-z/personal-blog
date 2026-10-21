@@ -35,6 +35,9 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm prisma generate
 
+      - name: Authorization regression tests
+        run: pnpm test --runInBand
+
       - name: Build
         run: pnpm build
 

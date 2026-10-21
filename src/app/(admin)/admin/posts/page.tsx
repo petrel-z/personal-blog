@@ -3,12 +3,13 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { api } from '@/client/api'
+import { PermissionGate } from '../../_components/PermissionGate'
 import { useAuth } from '../../_components'
 import { useToast } from '@/components/ui/toaster'
 import type { PostWithRelations } from '@/shared/types'
 
 export default function PostsPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, can } = useAuth()
   const { toast } = useToast()
   const [posts, setPosts] = useState<PostWithRelations[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -21,7 +22,7 @@ export default function PostsPage() {
   const fetchPosts = useCallback(async () => {
     try {
       setIsLoading(true)
-      const params: Record<string, string | number> = { page, pageSize: 10 }
+      const params: Record<string, string | number> = { page, pageSize: 10, scope: 'admin' }
       if (filter !== 'all') {
         params.status = filter
       }
@@ -104,12 +105,12 @@ export default function PostsPage() {
             共 {total} 篇文章
           </p>
         </div>
-        <Link
+        <PermissionGate permission="post:create"><Link
           href="/admin/posts/new"
           className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           写文章
-        </Link>
+        </Link></PermissionGate>
       </div>
 
       {/* Filters */}
@@ -185,12 +186,14 @@ export default function PostsPage() {
               posts.map((post) => (
                 <tr key={post.id} className="hover:bg-accent/50">
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/posts/${post.id}`}
-                      className="font-medium hover:text-primary hover:underline"
-                    >
-                      {post.title}
-                    </Link>
+                    {can('post:update') ? (
+                      <Link
+                        href={`/admin/posts/${post.id}`}
+                        className="font-medium hover:text-primary hover:underline"
+                      >
+                        {post.title}
+                      </Link>
+                    ) : <span className="font-medium">{post.title}</span>}
                     <div className="flex gap-1 mt-1">
                       {post.tags.slice(0, 3).map((tag) => (
                         <span key={tag.id} className="text-xs px-1.5 py-0.5 bg-sidebar rounded text-muted-foreground">
@@ -220,18 +223,18 @@ export default function PostsPage() {
                       : '-'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
+                    <PermissionGate permission="post:update"><Link
                       href={`/admin/posts/${post.id}`}
                       className="px-3 py-1 text-sm hover:bg-accent rounded transition-colors"
                     >
                       编辑
-                    </Link>
-                    <button
+                    </Link></PermissionGate>
+                    <PermissionGate permission="post:delete"><button
                       onClick={() => handleDelete(post.id)}
                       className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
                     >
                       删除
-                    </button>
+                    </button></PermissionGate>
                   </td>
                 </tr>
               ))

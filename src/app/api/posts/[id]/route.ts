@@ -1,3 +1,5 @@
+import { withPermission, accessErrorResponse } from '@/server/auth/route'
+import { requirePermission, assertPostOwner, type Actor } from '@/server/auth/access'
 /**
  * Post Detail API Routes
  * GET /api/posts/[id]
@@ -11,7 +13,6 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/server/db'
 import { getPostById, updatePost, deletePost, getAdjacentPosts } from '@/server/features/post'
-import { auth } from '@/auth'
 import { logAdminActionWithRequest, AuditAction } from '@/server/features/audit-log'
 import { success, errors } from '@/lib/api-response'
 import { getClientIp } from '@/server/lib/request'
@@ -34,39 +35,43 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const ip = getClientIp(request) || 'unknown'
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    // 检查是否已浏览（同一IP每天每篇只计一次）
-    const existingView = await prisma.postView.findFirst({
-      where: {
-        ip,
-        postId: params.id,
-        viewedAt: { gte: today },
-      },
-    })
-
-    if (!existingView) {
-      // 使用事务创建浏览记录并增加浏览量
-      await prisma.$transaction([
-        prisma.postView.create({
-          data: {
-            ip,
-            postId: params.id,
-          },
-        }),
-        prisma.post.update({
-          where: { id: params.id },
-          data: { viewCount: { increment: 1 } },
-        }),
-      ])
-    }
-
     const post = await getPostById(params.id)
+    if (!post || post.deletedAt) {
+      return NextResponse.json(errors.notFound('文章不存在'), { status: 404 })
+    }
+    if (post.status !== 'PUBLISHED') {
+      const actor = await requirePermission('post:read')
+      assertPostOwner(actor, post.authorId)
+    } else {
+      const ip = getClientIp(request) || 'unknown'
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
 
-    if (!post) {
-      return NextResponse.json(errors.notFound('文章不存在'))
+      // 检查是否已浏览（同一IP每天每篇只计一次）
+      const existingView = await prisma.postView.findFirst({
+        where: {
+          ip,
+          postId: params.id,
+          viewedAt: { gte: today },
+        },
+      })
+
+      if (!existingView) {
+        // 使用事务创建浏览记录并增加浏览量
+        const [, updatedPost] = await prisma.$transaction([
+          prisma.postView.create({
+            data: {
+              ip,
+              postId: params.id,
+            },
+          }),
+          prisma.post.update({
+            where: { id: params.id },
+            data: { viewCount: { increment: 1 } },
+          }),
+        ])
+        post.viewCount = updatedPost.viewCount
+      }
     }
 
     // Get adjacent posts (prev/next) within same category
@@ -76,20 +81,24 @@ export async function GET(
       post.publishedAt
     )
 
-    return NextResponse.json(success({ ...post, prev, next }))
+    return NextResponse.json(success({ ...post, prev, next }), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    })
   } catch (error) {
+    const denied = accessErrorResponse(error)
+    if (denied) return denied
     console.error('Failed to fetch post:', error)
     return NextResponse.json(errors.serverError('获取文章失败'))
   }
 }
 
 // PATCH /api/posts/[id]
-export async function PATCH(
+export const PATCH = withPermission('post:update', async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
+  actor: Actor
 ) {
   try {
-    const session = await auth()
     const body = await request.json()
     const validated = updatePostSchema.safeParse(body)
 
@@ -99,46 +108,45 @@ export async function PATCH(
       )
     }
 
-    const post = await updatePost(params.id, validated.data)
+    const post = await updatePost(params.id, validated.data, actor)
 
-    // Create audit log
-    if (session?.user?.id) {
-      const action = validated.data.status === 'PUBLISHED'
-        ? AuditAction.POST_PUBLISH
-        : validated.data.status === 'ARCHIVED'
-        ? AuditAction.POST_ARCHIVE
-        : AuditAction.POST_UPDATE
+    const action = validated.data.status === 'PUBLISHED'
+      ? AuditAction.POST_PUBLISH
+      : validated.data.status === 'ARCHIVED'
+      ? AuditAction.POST_ARCHIVE
+      : AuditAction.POST_UPDATE
 
-      await logAdminActionWithRequest(session.user.id, {
-        action,
-        target: post.title,
-        details: `更新文章: ${post.title}`,
-      }, request)
-    }
+    await logAdminActionWithRequest(actor.id, {
+      action,
+      target: post.title,
+      details: `更新文章: ${post.title}`,
+    }, request)
 
     return NextResponse.json(success(post))
   } catch (error) {
+    const denied = accessErrorResponse(error)
+    if (denied) return denied
     console.error('Failed to update post:', error)
     return NextResponse.json(errors.serverError('更新文章失败'))
   }
-}
+})
 
 // DELETE /api/posts/[id]
-export async function DELETE(
+export const DELETE = withPermission('post:delete', async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
+  actor: Actor
 ) {
   try {
-    const session = await auth()
 
     // Get post info before delete for audit log
     const post = await getPostById(params.id)
 
-    await deletePost(params.id)
+    await deletePost(params.id, actor)
 
     // Create audit log
-    if (session?.user?.id && post) {
-      await logAdminActionWithRequest(session.user.id, {
+    if (post) {
+      await logAdminActionWithRequest(actor.id, {
         action: AuditAction.POST_DELETE,
         target: post.title,
         details: `删除文章: ${post.title}`,
@@ -147,7 +155,9 @@ export async function DELETE(
 
     return NextResponse.json(success(null, '删除成功'))
   } catch (error) {
+    const denied = accessErrorResponse(error)
+    if (denied) return denied
     console.error('Failed to delete post:', error)
     return NextResponse.json(errors.serverError('删除文章失败'))
   }
-}
+})
