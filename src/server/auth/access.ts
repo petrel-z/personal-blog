@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { prisma } from '@/server/db'
-import { PERMISSIONS, type Permission } from '@/shared/permissions'
+import { PERMISSIONS, isAdminPermission, type Permission } from '@/shared/permissions'
 
 export interface Actor {
   id: string
@@ -37,11 +37,11 @@ export async function getActor(): Promise<Actor | null> {
 
   const isAdmin = user.userRoles.some(({ role }) => role.name === 'admin')
   const granted = new Set(user.userRoles.flatMap(({ role }) =>
-    role.rolePermissions.map(({ permission }) => permission.code)))
+    role.name === 'member' ? [] : role.rolePermissions.map(({ permission }) => permission.code)))
   return {
     id: user.id,
     isAdmin,
-    permissions: isAdmin ? [...PERMISSIONS] : PERMISSIONS.filter(code => granted.has(code)),
+    permissions: isAdmin ? [...PERMISSIONS] : PERMISSIONS.filter(code => !isAdminPermission(code) && granted.has(code)),
   }
 }
 
@@ -57,6 +57,12 @@ export async function requirePermission(permission: Permission | readonly Permis
   if (!required.some(code => actor.permissions.includes(code))) {
     throw new AccessError(403, '权限不足，无法执行此操作')
   }
+  return actor
+}
+
+export async function requireAdminPermission(permission: Permission): Promise<Actor> {
+  const actor = await requirePermission(permission)
+  if (!actor.isAdmin) throw new AccessError(403, '仅管理员可执行此操作')
   return actor
 }
 

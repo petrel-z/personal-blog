@@ -1,12 +1,40 @@
-export const PERMISSIONS = [
-  'dashboard:view',
-  'post:read', 'post:create', 'post:update', 'post:delete', 'post:publish',
-  'category:manage', 'tag:manage',
-  'comment:read', 'comment:approve', 'comment:reject', 'comment:delete',
-  'sensitive-word:manage', 'settings:update', 'user:read', 'audit:read', 'upload:create',
-] as const
+interface PermissionDefinition {
+  label: string
+  group: string
+  adminOnly?: boolean
+}
 
-export type Permission = typeof PERMISSIONS[number]
+export const PERMISSION_DEFINITIONS = {
+  'dashboard:view': { label: '查看仪表盘与统计', group: '仪表盘' },
+  'post:read': { label: '查看文章', group: '文章' },
+  'post:create': { label: '创建文章', group: '文章' },
+  'post:update': { label: '编辑文章', group: '文章' },
+  'post:delete': { label: '删除文章', group: '文章' },
+  'post:publish': { label: '发布文章', group: '文章' },
+  'category:manage': { label: '管理分类', group: '分类与标签' },
+  'tag:manage': { label: '管理标签', group: '分类与标签' },
+  'comment:read': { label: '查看评论', group: '评论' },
+  'comment:approve': { label: '通过评论', group: '评论' },
+  'comment:reject': { label: '拒绝评论', group: '评论' },
+  'comment:delete': { label: '删除评论', group: '评论' },
+  'sensitive-word:manage': { label: '管理敏感词', group: '内容审核' },
+  'settings:update': { label: '修改系统设置', group: '系统' },
+  'user:read': { label: '查看用户', group: '用户与角色' },
+  'audit:read': { label: '查看审计日志', group: '系统' },
+  'upload:create': { label: '上传文件', group: '文件' },
+  'role:read': { label: '查看角色详情', group: '用户与角色', adminOnly: true },
+  'role:update': { label: '配置角色权限', group: '用户与角色', adminOnly: true },
+  'user:create': { label: '创建后台用户', group: '用户与角色', adminOnly: true },
+  'user:assign-role': { label: '分配用户角色', group: '用户与角色', adminOnly: true },
+} as const satisfies Record<string, PermissionDefinition>
+
+export type Permission = keyof typeof PERMISSION_DEFINITIONS
+export const PERMISSIONS = Object.keys(PERMISSION_DEFINITIONS) as readonly Permission[]
+
+export function isAdminPermission(permission: Permission): boolean {
+  const definition: PermissionDefinition = PERMISSION_DEFINITIONS[permission]
+  return definition.adminOnly === true
+}
 
 export const ADMIN_PAGE_PERMISSIONS: Record<string, Permission> = {
   '/admin/dashboard': 'dashboard:view',
