@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { getComments, createComment } from '@/server/features/comment'
 import { success, errors, paginated } from '@/lib/api-response'
 import { ApiCode } from '@/lib/api-response'
+import { consumeCaptcha } from '@/server/features/auth/captcha.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ const createCommentSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   website: z.string().url().optional().or(z.literal('')),
   content: z.string().min(1).max(500),
-  captcha: z.string().length(4),
+  captchaCode: z.string().length(4),
   captchaId: z.string(),
   postId: z.string(),
   parentId: z.string().optional(),
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const validated = createCommentSchema.safeParse(body)
+    const validated = createCommentSchema.safeParse({...body, captchaCode: body.captchaCode ?? body.captcha})
 
     if (!validated.success) {
       return NextResponse.json(
@@ -53,22 +54,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify captcha
-    const captchaResponse = await fetch(new URL('/api/captcha', request.url), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        captchaId: validated.data.captchaId,
-        code: validated.data.captcha,
-      }),
-    })
-
-    const captchaResult = await captchaResponse.json()
-
-    if (captchaResult.code !== 2000) {
-      return NextResponse.json(
-        errors.unauthorized(captchaResult.message || '验证码错误或已过期')
-      )
+    if (!await consumeCaptcha({id:validated.data.captchaId, code:validated.data.captchaCode, purpose:'comment'})) {
+      return NextResponse.json(errors.badRequest('验证码错误或已过期'), {status:400})
     }
 
     // Get IP and UserAgent for rate limiting
@@ -79,6 +66,7 @@ export async function POST(request: Request) {
 
     const result = await createComment({
       ...validated.data,
+      captcha: validated.data.captchaCode,
       ip,
       userAgent,
     })

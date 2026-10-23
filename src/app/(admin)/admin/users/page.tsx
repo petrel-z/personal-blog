@@ -1,5 +1,7 @@
 'use client'
 
+import { useCaptcha } from '@/client/hooks/useCaptcha'
+
 import React, { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -34,7 +36,6 @@ export default function UsersPage() {
     register,
     handleSubmit,
     setValue,
-    watch,
     reset,
     formState: { errors },
   } = useForm<RegisterInput>({
@@ -48,7 +49,8 @@ export default function UsersPage() {
     },
   })
 
-  const captchaValue = watch('captcha')
+  const captcha = useCaptcha('register')
+  useEffect(() => { setValue('captcha', captcha.value, { shouldValidate: captcha.value.length === 4 }) }, [captcha.value, setValue])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
@@ -76,27 +78,10 @@ export default function UsersPage() {
     setRegisterSuccess(null)
 
     try {
-      // Verify captcha first
-      const captchaId = (window as unknown as { __captchaId?: string }).__captchaId
+      // Submit the challenge with the registration request.
+      const captchaId = captcha.id
       if (!captchaId) {
         setRegisterError('验证码已过期，请刷新页面重试')
-        setIsRegistering(false)
-        return
-      }
-
-      const captchaResponse = await fetch('/api/captcha', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          captchaId,
-          code: data.captcha,
-        }),
-      })
-
-      const captchaResult = await captchaResponse.json()
-
-      if (captchaResult.code !== 2000) {
-        setRegisterError(captchaResult.message || '验证码错误')
         setIsRegistering(false)
         return
       }
@@ -106,6 +91,8 @@ export default function UsersPage() {
         name: data.name,
         email: data.email,
         password: data.password,
+        captchaId,
+        captchaCode: data.captcha,
       })
 
       if (result.code === 2000 || result.code === 2010) {
@@ -115,9 +102,11 @@ export default function UsersPage() {
         fetchUsers()
       } else {
         setRegisterError(result.message || '注册失败')
+        await captcha.refresh()
       }
     } catch {
       setRegisterError('注册失败，请稍后重试')
+      await captcha.refresh()
     } finally {
       setIsRegistering(false)
     }
@@ -142,7 +131,14 @@ export default function UsersPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowRegisterForm(!showRegisterForm)}
+          onClick={() => {
+            if (!showRegisterForm) {
+              setRegisterSuccess(null)
+              setRegisterError(null)
+              void captcha.refresh()
+            }
+            setShowRegisterForm(!showRegisterForm)
+          }}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           {showRegisterForm ? '关闭注册' : '添加用户'}
@@ -264,8 +260,7 @@ export default function UsersPage() {
                 验证码
               </label>
               <CaptchaInput
-                value={captchaValue || ''}
-                onChange={(value) => setValue('captcha', value, { shouldValidate: true })}
+                captcha={captcha}
                 error={errors.captcha?.message}
               />
             </div>
@@ -273,7 +268,7 @@ export default function UsersPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={isRegistering}
+              disabled={isRegistering || captcha.loading || !captcha.id}
               className={clsx(
                 'w-full py-2 rounded-lg font-medium transition-colors',
                 'bg-primary text-primary-foreground',

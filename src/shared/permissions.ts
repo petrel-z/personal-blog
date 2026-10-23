@@ -27,3 +27,16 @@ export function canAccessAdminPage(permissions: readonly string[], pathname: str
     pathname === path || pathname.startsWith(`${path}/`))
   return !!entry && permissions.includes(entry[1])
 }
+
+/** Only canonical, authorized internal destinations may follow authentication. */
+export function getPostLoginPath(permissions: readonly Permission[], callbackUrl?: string): string {
+  if (callbackUrl?.startsWith('/') && !callbackUrl.startsWith('//') && !callbackUrl.includes('\\')) {
+    try {
+      const url = new URL(callbackUrl, 'https://internal.invalid')
+      // Reject encoded separators and traversal; don't turn a decoded route into a different grant.
+      if (url.origin === 'https://internal.invalid' && !/%(2e|2f|5c|25)/i.test(url.pathname) &&
+          canAccessAdminPage(permissions, url.pathname)) return url.pathname + url.search + url.hash
+    } catch { /* Fall through to the first authorized page. */ }
+  }
+  return Object.entries(ADMIN_PAGE_PERMISSIONS).find(([, permission]) => permissions.includes(permission))?.[0] || '/forbidden'
+}

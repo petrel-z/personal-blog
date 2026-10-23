@@ -1,9 +1,12 @@
 'use client'
 
-import React, { useState, Suspense } from 'react'
+import { useCaptcha } from '@/client/hooks/useCaptcha'
+
+import React, { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
+import { signIn } from 'next-auth/react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { clsx } from 'clsx'
 import { registerSchema, type RegisterInput } from '@/shared/validations'
@@ -19,9 +22,8 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     setValue,
-    watch,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -33,60 +35,46 @@ export default function RegisterPage() {
     },
   })
 
-  const captchaValue = watch('captcha')
+  const captcha = useCaptcha('register')
+  useEffect(() => { setValue('captcha', captcha.value, { shouldValidate: captcha.value.length === 4 }) }, [captcha.value, setValue])
 
   const onSubmit = async (data: RegisterInput) => {
     setError(null)
     setSuccess(null)
 
     try {
-      // Verify captcha first
-      const captchaId = (window as unknown as { __captchaId?: string }).__captchaId
+      // Submit the challenge with the registration request.
+      const captchaId = captcha.id
       if (!captchaId) {
         setError('验证码已过期，请刷新页面重试')
         return
       }
 
-      const captchaResponse = await fetch('/api/captcha', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          captchaId,
-          code: data.captcha,
-        }),
+      const result = await signIn('registration', {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        captchaId,
+        captchaCode: data.captcha,
+        redirect: false,
+        redirectTo: '/',
       })
 
-      const captchaResult = await captchaResponse.json()
-
-      if (captchaResult.code !== 2000) {
-        setError(captchaResult.message || '验证码错误')
-        return
-      }
-
-      // Register user
-      const result = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-        }),
-      })
-
-      const response = await result.json()
-
-      if (response.code === 2000 || response.code === 2010) {
-        setSuccess('注册成功！请前往登录')
+      if (result?.ok && !result.error) {
+        setSuccess('注册成功，正在进入首页')
         reset()
-        setTimeout(() => {
-          router.push('/login')
-        }, 1500)
+        router.replace('/')
+        router.refresh()
       } else {
-        setError(response.message || '注册失败')
+        setError(result?.code === 'registration_conflict' ? '该邮箱已被注册'
+          : result?.code === 'registration_captcha' ? '验证码错误或已过期'
+          : result?.code === 'registration_invalid' ? '注册信息验证失败，请检查后重试'
+          : '注册服务暂时不可用，请稍后重试')
+        await captcha.refresh()
       }
     } catch {
       setError('注册失败，请稍后重试')
+      await captcha.refresh()
     }
   }
 
@@ -229,8 +217,7 @@ export default function RegisterPage() {
                 验证码
               </label>
               <CaptchaInput
-                value={captchaValue || ''}
-                onChange={(value) => setValue('captcha', value, { shouldValidate: true })}
+                captcha={captcha}
                 error={errors.captcha?.message}
               />
             </div>
@@ -238,6 +225,7 @@ export default function RegisterPage() {
             {/* Submit */}
             <button
               type="submit"
+              disabled={isSubmitting || !!success || captcha.loading || !captcha.id}
               className={clsx(
                 'w-full py-2 rounded-lg font-medium transition-colors',
                 'bg-primary text-primary-foreground',

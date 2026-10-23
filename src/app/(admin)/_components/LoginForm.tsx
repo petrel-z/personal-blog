@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useCaptcha } from '@/client/hooks/useCaptcha'
+
+import React, { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { signIn } from 'next-auth/react'
@@ -17,12 +19,17 @@ export function LoginForm() {
 
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [retryAfter, setRetryAfter] = useState(0)
+  useEffect(() => {
+    if (retryAfter <= 0) return
+    const timer = setTimeout(() => setRetryAfter(value => Math.max(0, value - 1)), 1000)
+    return () => clearTimeout(timer)
+  }, [retryAfter])
 
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -33,34 +40,18 @@ export function LoginForm() {
     },
   })
 
-  const captchaValue = watch('captcha')
+  const captcha = useCaptcha('login')
+  useEffect(() => { setValue('captcha', captcha.value, { shouldValidate: captcha.value.length === 4 }) }, [captcha.value, setValue])
 
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // First verify captcha
-      const captchaId = (window as unknown as { __captchaId?: string }).__captchaId
+      // Submit the challenge with the credentials.
+      const captchaId = captcha.id
       if (!captchaId) {
         setError('验证码已过期，请刷新页面重试')
-        setIsLoading(false)
-        return
-      }
-
-      const captchaResponse = await fetch('/api/captcha', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          captchaId,
-          code: data.captcha,
-        }),
-      })
-
-      const captchaResult = await captchaResponse.json()
-
-      if (captchaResult.code !== 2000) {
-        setError(captchaResult.message || '验证码错误')
         setIsLoading(false)
         return
       }
@@ -69,20 +60,33 @@ export function LoginForm() {
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
+        captchaId,
+        captchaCode: data.captcha,
         redirect: false,
       })
 
       if (result?.error) {
-        setError('邮箱或密码错误')
+        const locked = /^locked_(\d+)$/.exec(result.code || '')
+        if (locked) setRetryAfter(Number(locked[1]))
+        setError(locked ? '登录尝试过多，请等待后重试'
+          : result.code === 'captcha' ? '验证码错误或已过期，请重新输入'
+          : result.code === 'unavailable' || result.error !== 'CredentialsSignin' ? '登录服务暂时不可用，请稍后重试'
+          : '邮箱或密码错误')
+        await captcha.refresh()
         setIsLoading(false)
         return
       }
 
       // Success - redirect
-      router.push(callbackUrl)
+      if (!result?.ok) throw new Error('Login failed')
+      const response = await fetch(`/api/auth/access?callbackUrl=${encodeURIComponent(callbackUrl)}`, {cache:'no-store'})
+      const access = await response.json()
+      if (!response.ok || access.code !== 2000 || !access.data?.destination) throw new Error('Access unavailable')
+      router.replace(access.data.destination)
       router.refresh()
     } catch {
       setError('登录失败，请稍后重试')
+      await captcha.refresh()
       setIsLoading(false)
     }
   }
@@ -137,8 +141,7 @@ export function LoginForm() {
           验证码
         </label>
         <CaptchaInput
-          value={captchaValue || ''}
-          onChange={(value) => setValue('captcha', value, { shouldValidate: true })}
+          captcha={captcha}
           error={errors.captcha?.message}
         />
       </div>
@@ -153,7 +156,7 @@ export function LoginForm() {
       {/* Submit */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || captcha.loading || !captcha.id || retryAfter > 0}
         className={clsx(
           'w-full py-2 rounded-lg font-medium transition-colors',
           'bg-primary text-primary-foreground',
@@ -161,7 +164,7 @@ export function LoginForm() {
           'disabled:opacity-50 disabled:cursor-not-allowed'
         )}
       >
-        {isLoading ? '登录中...' : '登录'}
+        {retryAfter > 0 ? `${retryAfter} 秒后重试` : isLoading ? '登录中...' : '登录'}
       </button>
     </form>
   )

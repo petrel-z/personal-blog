@@ -10,6 +10,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Short-lived, purpose-bound challenges. Plaintext codes are never persisted.
+model CaptchaChallenge {
+  id        String   @id
+  purpose   String
+  codeHash  String   @db.Char(64)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  key         String    @id @db.VarChar(191)
+  failures    Int       @default(0)
+  lockedUntil DateTime?
+}
+
+model AuthRateBucket {
+  key         String   @id @db.VarChar(191)
+  count       Int      @default(0)
+  windowStart DateTime
+
+  @@index([windowStart])
+}
+
 // ============================================
 // RBAC Permission Model
 // ============================================

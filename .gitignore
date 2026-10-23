@@ -49,3 +49,6 @@ coverage
 doc
 doc/design
 doc/dev
+
+# Isolated authentication test environment
+.env.auth-test
