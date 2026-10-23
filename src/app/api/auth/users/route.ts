@@ -23,6 +23,10 @@ export const GET = withPermission('user:read', async function GET() {
         image: true,
         createdAt: true,
         updatedAt: true,
+        userRoles: {
+          select: { role: { select: { id: true, name: true } } },
+          orderBy: { role: { name: 'asc' } },
+        },
         _count: {
           select: {
             posts: true,
@@ -34,9 +38,12 @@ export const GET = withPermission('user:read', async function GET() {
       },
     })
 
-    return NextResponse.json(success(users))
+    return NextResponse.json(success(users.map(({ userRoles, ...user }) => ({
+      ...user,
+      roles: userRoles.map(({ role }) => role),
+    }))))
   } catch (error) {
     console.error('Failed to fetch users:', error)
-    return NextResponse.json(errors.serverError('获取用户列表失败'))
+    return NextResponse.json(errors.serverError('获取用户列表失败'), { status: 500 })
   }
 })

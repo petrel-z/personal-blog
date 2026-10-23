@@ -9,6 +9,8 @@ import { clsx } from 'clsx'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
 import { registerSchema, type RegisterInput } from '@/shared/validations'
+import { ROLE_DEFINITIONS } from '@/shared/roles'
+import type { BuiltinRoleName } from '@/shared/types/authorization'
 import { CaptchaInput } from '../../_components/CaptchaInput'
 
 interface User {
@@ -17,6 +19,7 @@ interface User {
   email: string
   image: string | null
   createdAt: string
+  roles: { id: string; name: string }[]
   _count: {
     posts: number
   }
@@ -60,12 +63,17 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true)
+      setError(null)
       const result = await api.get('/auth/users') as { code: number; data: User[]; message: string }
 
       if (result.code === 2000) {
         setUsers(result.data || [])
+      } else {
+        setUsers([])
+        setError(result.message || '获取用户列表失败')
       }
     } catch {
+      setUsers([])
       setError('获取用户列表失败')
     } finally {
       setIsLoading(false)
@@ -283,12 +291,13 @@ export default function UsersPage() {
       )}
 
       {/* Users Table */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-x-auto">
         <table className="w-full">
           <thead className="bg-sidebar">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium">用户名</th>
               <th className="px-4 py-3 text-left text-sm font-medium">邮箱</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">角色</th>
               <th className="px-4 py-3 text-left text-sm font-medium">文章数</th>
               <th className="px-4 py-3 text-left text-sm font-medium">注册时间</th>
             </tr>
@@ -296,8 +305,8 @@ export default function UsersPage() {
           <tbody className="divide-y">
             {users.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                  暂无用户
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                  {error ? '用户列表暂不可用' : '暂无用户'}
                 </td>
               </tr>
             ) : (
@@ -315,6 +324,21 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {user.email}
+                  </td>
+                  <td className="px-4 py-3">
+                    {user.roles.length === 0 ? (
+                      <span className="text-sm text-muted-foreground">未分配</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {user.roles.map(role => (
+                          <span key={role.id} className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                            {Object.hasOwn(ROLE_DEFINITIONS, role.name)
+                              ? ROLE_DEFINITIONS[role.name as BuiltinRoleName].label
+                              : role.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {user._count.posts}

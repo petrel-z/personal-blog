@@ -1,6 +1,6 @@
 # 后台角色管理 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-23 用户要求先完成 F05.1、不提交；F05.1 已完成并保留未提交修改，其余五项尚未开始，不自动继续实施。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-23 用户已要求提交 F05.1 并继续开发；F05.1 已提交为 `473a0f5`，F05.2 已完成并保留未提交修改，其余四项尚未开始。
 
 **Goal:** 让管理员在后台查看用户角色、分配角色、维护业务权限并创建指定角色的用户。
 
@@ -16,8 +16,8 @@
 
 | 顺序 | 小功能 | 用户可验收的结果 | 依赖 |
 | --- | --- | --- | --- |
-| F05.1（已完成，未提交） | 统一角色、权限目录和管理边界 | 四种角色规则一致；初始化不覆盖已配置授权；仅 admin 能管理授权 | 阶段一 |
-| F05.2 | 用户列表展示角色 | 每个用户显示一个或多个中文角色标签，无角色显示“未分配” | F05.1 |
+| F05.1（已提交 473a0f5） | 统一角色、权限目录和管理边界 | 四种角色规则一致；初始化不覆盖已配置授权；仅 admin 能管理授权 | 阶段一 |
+| F05.2（已完成，未提交） | 用户列表展示角色 | 每个用户显示一个或多个中文角色标签，无角色显示“未分配” | F05.1 |
 | F05.3 | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
 | F06 | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
 | F07 | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
@@ -81,10 +81,19 @@
 
 **Interfaces:** GET `/api/auth/users` 保留原字段与 `user:read` 边界，增加 `roles: {id: string; name: string}[]`；标签使用 F05.1 的中文目录，未知旧角色回退显示原名，不静默丢弃。
 
-- [ ] 写失败测试：具有 user:read 的非 admin 可以读取角色标签；无权限拒绝；无角色返回空数组；响应不含 password 或密码哈希。
-- [ ] 运行 `pnpm test --runInBand tests/user-role-read.test.ts`，确认原接口缺少角色字段。
-- [ ] 查询用户时选取角色 ID/名称，用户表格增加角色列，支持多标签、“未分配”和未知旧角色名称；不把中文显示名当授权依据。
-- [ ] 同组单元测试及 `pnpm exec playwright test --config=playwright.auth.config.ts tests/integration/admin-roles.spec.ts` 通过，验收管理员与只读用户两个视角。
+- [x] 写失败测试：具有 user:read 的非 admin 可以读取角色标签；无权限拒绝；无角色返回空数组；响应不含 password 或密码哈希。
+- [x] 运行 `pnpm test --runInBand tests/user-role-read.test.ts`，确认原接口缺少角色字段。
+- [x] 查询用户时选取角色 ID/名称，用户表格增加角色列，支持多标签、“未分配”和未知旧角色名称；不把中文显示名当授权依据。
+- [x] 同组单元测试及 `pnpm exec playwright test --config=playwright.auth.config.ts tests/integration/admin-roles.spec.ts` 通过，验收管理员与只读用户两个视角。
+
+**执行记录（2026-10-23，基线 473a0f5）：**
+
+- 用户要求提交已有代码并继续开发，已将 F05.1 提交为 `473a0f5`；沿用逐个小功能验收方式，本次完成 F05.2，新增修改保留未提交。
+- 入口保持 `/admin/users` → GET `/api/auth/users`，沿用 `user:read`；数据库只选取角色 ID/名称，返回平铺的 roles 数组，保留原用户字段，过滤已删除用户，不返回密码或角色权限详情。角色按名称排序；前端复用共享中文目录，支持多标签、无角色和未知旧角色原名。
+- Ruling：查询失败原先返回 HTTP 200，且客户端会忽略业务失败；本次一并改为 HTTP 500、显示错误并清空过期列表，空态区分不可用与暂无用户。这属于角色读取链路的异常验收；影响仅限列表请求失败时的表现。
+- RED：5 项新增单元测试中 3 项按预期失败（两种授权读者缺少 roles、数据库失败返回 200）；3 项新增集成测试中两种读者的页面用例因缺少角色列失败，未授权读取用例通过。
+- GREEN：新增 5 项单元测试及 3 项真实 MySQL／浏览器测试通过；完整 Jest 14 套 / 185 项、认证 Playwright 28 项通过，包含注册自动登录与验证码回归。TypeScript、本次代码文件 ESLint、差异格式检查通过。
+- 浏览器用例覆盖管理员、仅有 user:read 的非管理员、多角色、普通会员、未分配、旧角色名称、已删除用户过滤、响应字段白名单、401/403，以及接口错误可见；测试在临时副本和隔离数据库执行，未修改应用数据库。完成作者自审；当前侧聊不使用子代理。
 
 ### F05.3：角色列表与权限详情
 
