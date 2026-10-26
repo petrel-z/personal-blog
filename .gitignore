@@ -13,6 +13,9 @@ dist
 # Misc
 .DS_Store
 *.pem
+# Public, disposable loopback SMTP test fixtures only.
+!tests/fixtures/smtp/localhost-cert.pem
+!tests/fixtures/smtp/localhost-key.pem
 
 # Debug
 npm-debug.log*

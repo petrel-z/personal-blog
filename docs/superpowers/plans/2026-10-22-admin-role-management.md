@@ -1,6 +1,6 @@
 # 后台角色管理 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-26 用户要求“提交并继续”；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已提交为 `091daaf`；F06 已提交为 `82dca4b`，F07 已提交为 `c1c8ec5`，F08 已完成并验收、尚未提交。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-26 用户要求“提交并继续”；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已提交为 `091daaf`；F06 已提交为 `82dca4b`，F07 已提交为 `c1c8ec5`，F08 已提交为 `e763246`。
 
 **Goal:** 让管理员在后台查看用户角色、分配角色、维护业务权限并创建指定角色的用户。
 
@@ -21,7 +21,7 @@
 | F05.3（已提交 091daaf） | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
 | F06（已提交 82dca4b） | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
 | F07（已提交 c1c8ec5） | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
-| F08（已验收，待提交） | 后台创建指定角色用户 | 创建时选择角色，账号与角色一起成功；当前管理员保持登录；写入审计 | F06 |
+| F08（已提交 e763246） | 后台创建指定角色用户 | 创建时选择角色，账号与角色一起成功；当前管理员保持登录；写入审计 | F06 |
 
 按表格顺序交付，每项包含必要的前端、服务端和验收，不拆成只能展示但没有鉴权的半成品。F05.2 与 F05.3 在接口确定后逻辑上独立；本侧聊按顺序实施。
 
@@ -191,7 +191,7 @@
 - 已验证：真实同邮箱并发仅一次成功；角色写入失败与审计写入失败均回滚账号；软删除邮箱不可复用；新建账号密码可实际登录；管理员会话保持；两个公开注册入口伪造管理员角色无效；表单重试、角色必选、密码字节校验与提交中禁用均通过。
 - 测试布局：用独立 admin-user-create.spec.ts 承载 F08 数据库和表单边界；将两个旧的后台注册／验证码用例更新为管理员专用创建及普通读取者拒绝用例，公开注册和评论兼容性用例保留。
 - 已查看真实创建表单截图；按计划逐项完成作者自审，没有独立审阅者，无待修复问题。隔离库的 managed-/registration- 测试账号和 managed_ 临时触发器剩余均为零。无新增依赖或数据库迁移。
-- 证据日志：`/var/folders/wq/czh3jxv940nf6d5nqsf7yy100000gn/T/blog-f08-a88rhinw/`；F08 尚未提交，阶段三未开始。
+- 证据日志：`/var/folders/wq/czh3jxv940nf6d5nqsf7yy100000gn/T/blog-f08-a88rhinw/`。后续用户要求“提交代码，继续开发”，重新确认 265 项 Jest 与 TypeScript 通过后，以“feat(auth): 支持管理员创建指定角色用户”提交为 `e763246`，转入阶段三 F09。
 
 ## 阶段验收
 
