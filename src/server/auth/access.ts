@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { prisma } from '@/server/db'
-import { PERMISSIONS, isAdminPermission, type Permission } from '@/shared/permissions'
+import { PERMISSIONS, type Permission } from '@/shared/permissions'
+import { getEffectiveRolePermissions } from '@/shared/roles'
 
 export interface Actor {
   id: string
@@ -37,11 +38,11 @@ export async function getActor(): Promise<Actor | null> {
 
   const isAdmin = user.userRoles.some(({ role }) => role.name === 'admin')
   const granted = new Set(user.userRoles.flatMap(({ role }) =>
-    role.name === 'member' ? [] : role.rolePermissions.map(({ permission }) => permission.code)))
+    getEffectiveRolePermissions(role.name, role.rolePermissions.map(({ permission }) => permission.code))))
   return {
     id: user.id,
     isAdmin,
-    permissions: isAdmin ? [...PERMISSIONS] : PERMISSIONS.filter(code => !isAdminPermission(code) && granted.has(code)),
+    permissions: PERMISSIONS.filter(code => granted.has(code)),
   }
 }
 

@@ -1,6 +1,6 @@
 # 后台角色管理 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-23 用户已要求提交 F05.1 并继续开发；F05.1 已提交为 `473a0f5`，F05.2 已完成并保留未提交修改，其余四项尚未开始。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-23 用户要求提交 F05.2 后继续；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已完成并保留未提交修改，其余三项尚未开始。
 
 **Goal:** 让管理员在后台查看用户角色、分配角色、维护业务权限并创建指定角色的用户。
 
@@ -17,8 +17,8 @@
 | 顺序 | 小功能 | 用户可验收的结果 | 依赖 |
 | --- | --- | --- | --- |
 | F05.1（已提交 473a0f5） | 统一角色、权限目录和管理边界 | 四种角色规则一致；初始化不覆盖已配置授权；仅 admin 能管理授权 | 阶段一 |
-| F05.2（已完成，未提交） | 用户列表展示角色 | 每个用户显示一个或多个中文角色标签，无角色显示“未分配” | F05.1 |
-| F05.3 | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
+| F05.2（已提交 ccbece7） | 用户列表展示角色 | 每个用户显示一个或多个中文角色标签，无角色显示“未分配” | F05.1 |
+| F05.3（已完成，未提交） | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
 | F06 | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
 | F07 | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
 | F08 | 后台创建指定角色用户 | 创建时选择角色，账号与角色一起成功；当前管理员保持登录；写入审计 | F06 |
@@ -97,14 +97,25 @@
 
 ### F05.3：角色列表与权限详情
 
-**Files:** 新增 `src/server/features/auth/role.service.ts`、`src/app/api/auth/roles/route.ts`、`src/app/(admin)/admin/roles/page.tsx`、`src/app/(admin)/admin/roles/_components/RoleManager.tsx`；修改 `src/shared/permissions.ts`、`src/app/(admin)/_components/AdminSidebar.tsx`；新增 `tests/role-read.test.ts`，扩展 `tests/integration/admin-roles.spec.ts`。
+**Files:** 新增 `src/server/features/auth/role.service.ts`、`src/app/api/auth/roles/route.ts`、`src/app/(admin)/admin/roles/page.tsx`、`src/app/(admin)/admin/roles/_components/RoleManager.tsx`；修改 `src/shared/permissions.ts`、`src/shared/roles.ts`、`src/shared/types/authorization.ts`、`src/server/auth/access.ts`、`src/app/(admin)/_components/AdminSidebar.tsx`；新增 `tests/role-read.test.ts`，扩展 `tests/integration/admin-roles.spec.ts`。
 
 **Interfaces:** `RoleSummary = {id: string; name: BuiltinRoleName; description: string | null; memberCount: number; permissions: Permission[]}`；`listRoles(actor: Actor): Promise<RoleSummary[]>`；GET `/api/auth/roles` 返回数据库内四种内置角色，缺少默认数据时显示需初始化的提示，读取不得自动创建角色。`/admin/roles` 映射 `role:read`；页面服务端入口也调用 `requireAdminPermission`。
 
-- [ ] 写失败测试：仅 admin 能读取角色详情；有效成员数不计已删除用户；admin 展示完整权限、member 展示无后台权限；缺失角色不产生数据库写入。
-- [ ] 运行 `pnpm test --runInBand tests/role-read.test.ts`，确认预期失败。
-- [ ] 实现角色查询和“角色管理”菜单，展示中文说明、成员数及分组权限；admin/member 明确只读，业务权限编辑按钮在 F07 接入。
-- [ ] 同组单元测试、角色浏览器测试及类型检查通过，验证非 admin 直接访问页面和 API 都被拒绝。
+- [x] 写失败测试：仅 admin 能读取角色详情；有效成员数不计已删除用户；admin 展示完整权限、member 展示无后台权限；缺失角色不产生数据库写入。
+- [x] 运行 `pnpm test --runInBand tests/role-read.test.ts`，确认预期失败。
+- [x] 实现角色查询和“角色管理”菜单，展示中文说明、成员数及分组权限；admin/member 明确只读，业务权限编辑按钮在 F07 接入。
+- [x] 同组单元测试、角色浏览器测试及类型检查通过，验证非 admin 直接访问页面和 API 都被拒绝。
+
+**执行记录（2026-10-23，基线 ccbece7）：**
+
+- 按用户“提交，然后继续”指令，将 F05.2 提交为 `ccbece7`，完成下一项 F05.3；新增修改保留未提交，F06–F08 尚未开始。
+- 角色菜单通过 role:read 页面映射显示；页面服务端 requireAdminPermission 和 API withAdminPermission 分别验证当前数据库管理员身份。GET /api/auth/roles 调用 listRoles，只返回已存在的四种内置角色、说明、未删除成员数和有效权限，查询不补建角色或回填授权。
+- Ruling：从 getActor 提取 getEffectiveRolePermissions，供鉴权和角色详情共用，防止两处计算规则分叉。保持已有规则：admin 完整目录、member 空权限，其他角色过滤未知码和管理权限；getActor 仍取多个角色的有效权限并集，兼容旧角色。
+- 页面支持切换角色、按模块展示权限、空权限说明、缺失角色提示以及失败重试；admin/member 显示权限只读。只展示现有角色数据，不提前提供尚未接入的编辑按钮。
+- RED：新增角色接口尚不存在时落入 Auth.js 通配路由，3 项新增真实库／浏览器用例因 HTTP 400 失败；新增单元测试最初因实现模块缺失未能运行。实现后新增 8 项单元测试通过，连同已有授权／跳转测试共 39 项通过。
+- 浏览器初验发现测试中的 alert 同时匹配 Next.js 路由播报节点，已将定位限定到 main。另经 trace 确认服务器已输出 /forbidden 的拒绝跳转，但现有 AuthProvider 可以先显示无权限视图，令网址保留原路径。Ruling：验收页面实际拒绝、角色组件和数据请求未加载，不强制固定落地 URL；保留现有后台无权限交互，API 仍必须实际返回 401/403，页面单元测试独立核对服务端边界。
+- 最终完整回归：Jest 15 套 / 193 项通过；认证 Playwright / 隔离 MySQL 31 项通过；TypeScript、本次文件 ESLint、差异格式检查通过。新增集成用例验证错误授予的管理权限不可用、成员数排除软删除用户、缺失角色读取不创建数据、请求失败和重试，以及菜单和直达访问边界。
+- 已查看真实浏览器截图并完成作者自审；测试使用临时副本与隔离数据库，未修改应用数据库，未使用子代理。
 
 ### F06：分配用户角色与最后管理员保护
 

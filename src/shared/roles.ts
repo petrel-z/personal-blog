@@ -1,4 +1,4 @@
-import { PERMISSIONS } from './permissions'
+import { PERMISSIONS, isAdminPermission, type Permission } from './permissions'
 import type { BuiltinRoleName, RoleDefinition } from './types/authorization'
 
 // Defaults apply only when a role is first created; later business grants come from the database.
@@ -24,3 +24,11 @@ export const ROLE_DEFINITIONS = {
     defaultPermissions: [],
   },
 } as const satisfies Record<BuiltinRoleName, RoleDefinition>
+
+/** Keep displayed role permissions and request authorization on the same rules. */
+export function getEffectiveRolePermissions(name: string, grantedCodes: readonly string[]): Permission[] {
+  if (name === 'admin') return [...PERMISSIONS]
+  if (name === 'member') return []
+  const granted = new Set(grantedCodes)
+  return PERMISSIONS.filter(code => !isAdminPermission(code) && granted.has(code))
+}

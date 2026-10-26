@@ -47,6 +47,7 @@ export const ADMIN_PAGE_PERMISSIONS: Record<string, Permission> = {
   '/admin/sensitive-words': 'sensitive-word:manage',
   '/admin/settings': 'settings:update',
   '/admin/users': 'user:read',
+  '/admin/roles': 'role:read',
   '/admin/audit-logs': 'audit:read',
 }
 

@@ -7,3 +7,11 @@ export interface RoleDefinition {
   description: string
   defaultPermissions: readonly Permission[]
 }
+
+export interface RoleSummary {
+  id: string
+  name: BuiltinRoleName
+  description: string | null
+  memberCount: number
+  permissions: Permission[]
+}
