@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { registerMember, RegistrationError } from '@/server/features/auth/registration.service'
 import { success, errors } from '@/lib/api-response'
 
-// Account creation only: adding a user must preserve the current administrator's session.
+// Public account creation without automatic sign-in; roles are always assigned by registerMember.
 export async function POST(request: Request) {
   try {
     const user = await registerMember(await request.json())

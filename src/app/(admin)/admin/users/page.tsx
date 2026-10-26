@@ -1,19 +1,13 @@
 'use client'
 
-import { useCaptcha } from '@/client/hooks/useCaptcha'
-
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { clsx } from 'clsx'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
-import { registerSchema, type RegisterInput } from '@/shared/validations'
 import { ROLE_DEFINITIONS } from '@/shared/roles'
 import type { BuiltinRoleName } from '@/shared/types/authorization'
-import { CaptchaInput } from '../../_components/CaptchaInput'
 import { UserRoleEditor } from './_components/UserRoleEditor'
+import { CreateUserForm } from './_components/CreateUserForm'
 
 interface User {
   id: string
@@ -36,30 +30,9 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showRegisterForm, setShowRegisterForm] = useState(false)
-  const [registerError, setRegisterError] = useState<string | null>(null)
-  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null)
-  const [isRegistering, setIsRegistering] = useState(false)
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    reset,
-    formState: { errors },
-  } = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      captcha: '',
-    },
-  })
-
-  const captcha = useCaptcha('register')
-  useEffect(() => { setValue('captcha', captcha.value, { shouldValidate: captcha.value.length === 4 }) }, [captcha.value, setValue])
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) return
@@ -86,46 +59,6 @@ export default function UsersPage() {
     }
   }
 
-  const onSubmitRegister = async (data: RegisterInput) => {
-    setIsRegistering(true)
-    setRegisterError(null)
-    setRegisterSuccess(null)
-
-    try {
-      // Submit the challenge with the registration request.
-      const captchaId = captcha.id
-      if (!captchaId) {
-        setRegisterError('验证码已过期，请刷新页面重试')
-        setIsRegistering(false)
-        return
-      }
-
-      // Register user
-      const result = await api.post('/auth/register', {
-        name: data.name,
-        email: data.email,
-        password: data.password,
-        captchaId,
-        captchaCode: data.captcha,
-      })
-
-      if (result.code === 2000 || result.code === 2010) {
-        setRegisterSuccess('用户注册成功')
-        reset()
-        setShowRegisterForm(false)
-        fetchUsers()
-      } else {
-        setRegisterError(result.message || '注册失败')
-        await captcha.refresh()
-      }
-    } catch {
-      setRegisterError('注册失败，请稍后重试')
-      await captcha.refresh()
-    } finally {
-      setIsRegistering(false)
-    }
-  }
-
   if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -144,19 +77,13 @@ export default function UsersPage() {
             管理系统用户账户
           </p>
         </div>
-        <button
-          onClick={() => {
-            if (!showRegisterForm) {
-              setRegisterSuccess(null)
-              setRegisterError(null)
-              void captcha.refresh()
-            }
-            setShowRegisterForm(!showRegisterForm)
-          }}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          {showRegisterForm ? '关闭注册' : '添加用户'}
-        </button>
+        {can('user:create') && (
+          <button type="button" disabled={isCreating}
+            onClick={() => { setShowCreateForm(value => !value); setCreateSuccess(null) }}
+            className="rounded-lg bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            {showCreateForm ? '取消添加' : '添加用户'}
+          </button>
+        )}
       </div>
 
       {/* Error */}
@@ -166,134 +93,15 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Register Form */}
-      {showRegisterForm && (
-        <div className="border rounded-lg p-6 bg-card">
-          <h2 className="text-lg font-semibold mb-4">注册新用户</h2>
-
-          {registerSuccess && (
-            <div className="p-3 mb-4 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg">
-              {registerSuccess}
-            </div>
-          )}
-
-          {registerError && (
-            <div className="p-3 mb-4 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg">
-              {registerError}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit(onSubmitRegister)} className="space-y-4">
-            {/* Name */}
-            <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                用户名
-              </label>
-              <input
-                id="name"
-                type="text"
-                placeholder="输入用户名"
-                className={clsx(
-                  'w-full px-3 py-2 border rounded-lg bg-background',
-                  'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                  errors.name && 'border-red-500 focus:ring-red-500/50'
-                )}
-                {...register('name')}
-              />
-              {errors.name && (
-                <p className="text-xs text-red-500">{errors.name.message}</p>
-              )}
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                邮箱
-              </label>
-              <input
-                id="email"
-                type="email"
-                placeholder="user@example.com"
-                className={clsx(
-                  'w-full px-3 py-2 border rounded-lg bg-background',
-                  'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                  errors.email && 'border-red-500 focus:ring-red-500/50'
-                )}
-                {...register('email')}
-              />
-              {errors.email && (
-                <p className="text-xs text-red-500">{errors.email.message}</p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                密码
-              </label>
-              <input
-                id="password"
-                type="password"
-                placeholder="至少6位"
-                className={clsx(
-                  'w-full px-3 py-2 border rounded-lg bg-background',
-                  'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                  errors.password && 'border-red-500 focus:ring-red-500/50'
-                )}
-                {...register('password')}
-              />
-              {errors.password && (
-                <p className="text-xs text-red-500">{errors.password.message}</p>
-              )}
-            </div>
-
-            {/* Confirm Password */}
-            <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">
-                确认密码
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                placeholder="再次输入密码"
-                className={clsx(
-                  'w-full px-3 py-2 border rounded-lg bg-background',
-                  'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                  errors.confirmPassword && 'border-red-500 focus:ring-red-500/50'
-                )}
-                {...register('confirmPassword')}
-              />
-              {errors.confirmPassword && (
-                <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>
-              )}
-            </div>
-
-            {/* Captcha */}
-            <div className="space-y-2">
-              <label htmlFor="captcha" className="text-sm font-medium">
-                验证码
-              </label>
-              <CaptchaInput
-                captcha={captcha}
-                error={errors.captcha?.message}
-              />
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isRegistering || captcha.loading || !captcha.id}
-              className={clsx(
-                'w-full py-2 rounded-lg font-medium transition-colors',
-                'bg-primary text-primary-foreground',
-                'hover:bg-primary/90',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-            >
-              {isRegistering ? '注册中...' : '注册'}
-            </button>
-          </form>
-        </div>
+      {createSuccess && <p role="status" className="text-sm text-green-700">{createSuccess}</p>}
+      {can('user:create') && showCreateForm && (
+        <CreateUserForm saving={isCreating} onSavingChange={setIsCreating}
+          onSaved={async () => {
+            setShowCreateForm(false)
+            setCreateSuccess('用户创建成功')
+            await fetchUsers()
+            router.refresh()
+          }} />
       )}
 
       {/* Users Table */}

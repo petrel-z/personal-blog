@@ -2,15 +2,12 @@ import { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/server/db'
+import { accountSchema } from '@/shared/validations/account'
 import { consumeCaptcha } from './captcha.service'
-import { normalizeEmail } from './identity'
 
-const registrationSchema = z.object({
+const registrationSchema = accountSchema.extend({
   captchaId: z.string().min(1).max(64),
   captchaCode: z.string().length(4),
-  name: z.string().min(1, '用户名不能为空').max(50, '用户名不能超过50字符'),
-  email: z.string().trim().email('邮箱格式无效').max(254).transform(normalizeEmail),
-  password: z.string().min(6, '密码至少6位').max(100, '密码不能超过100位'),
 })
 
 export class RegistrationError extends Error {
@@ -19,7 +16,7 @@ export class RegistrationError extends Error {
   }
 }
 
-// Both public sign-up and admin account creation use the same validation and member assignment.
+// Both public registration entry points assign member, ignoring client-supplied roles.
 export async function registerMember(input: unknown) {
   const validated = registrationSchema.safeParse(input)
   if (!validated.success) {

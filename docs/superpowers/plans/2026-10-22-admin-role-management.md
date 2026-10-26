@@ -1,6 +1,6 @@
 # 后台角色管理 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-26 用户要求“提交并继续”；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已提交为 `091daaf`；F06 已提交为 `82dca4b`，F07 已完成并验收、尚未提交，F08 尚未开始。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-26 用户要求“提交并继续”；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已提交为 `091daaf`；F06 已提交为 `82dca4b`，F07 已提交为 `c1c8ec5`，F08 已完成并验收、尚未提交。
 
 **Goal:** 让管理员在后台查看用户角色、分配角色、维护业务权限并创建指定角色的用户。
 
@@ -20,8 +20,8 @@
 | F05.2（已提交 ccbece7） | 用户列表展示角色 | 每个用户显示一个或多个中文角色标签，无角色显示“未分配” | F05.1 |
 | F05.3（已提交 091daaf） | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
 | F06（已提交 82dca4b） | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
-| F07（已验收，待提交） | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
-| F08 | 后台创建指定角色用户 | 创建时选择角色，账号与角色一起成功；当前管理员保持登录；写入审计 | F06 |
+| F07（已提交 c1c8ec5） | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
+| F08（已验收，待提交） | 后台创建指定角色用户 | 创建时选择角色，账号与角色一起成功；当前管理员保持登录；写入审计 | F06 |
 
 按表格顺序交付，每项包含必要的前端、服务端和验收，不拆成只能展示但没有鉴权的半成品。F05.2 与 F05.3 在接口确定后逻辑上独立；本侧聊按顺序实施。
 
@@ -167,14 +167,31 @@
 
 ### F08：后台新增用户及指定角色
 
-**Files:** 修改 `src/app/api/auth/users/route.ts`、`src/server/features/auth/user.service.ts`、`src/app/(admin)/admin/users/page.tsx`、审计动作目录与审计页中文动作名；按需提取共用账号输入校验供 `registration.service.ts` 复用；新增 `tests/admin-user-create.test.ts`，扩展 `tests/integration/registration.spec.ts`、`tests/integration/forms-compatibility.spec.ts`。
+**Files:** 修改 `src/app/api/auth/users/route.ts`、`src/server/features/auth/user.service.ts`、`src/app/(admin)/admin/users/page.tsx`、审计动作目录与审计页中文动作名；按需提取共用账号输入校验供 `registration.service.ts` 复用；新增 `CreateUserForm.tsx`、`src/shared/validations/account.ts`、`tests/admin-user-create.test.ts`、`tests/integration/admin-user-create.spec.ts`，扩展 `tests/integration/registration.spec.ts`、`tests/integration/forms-compatibility.spec.ts`。
 
 **Interfaces:** `createManagedUser(actor: Actor, input: {name: string; email: string; password: string; roleIds: string[]}): Promise<{id: string; email: string}>`；POST `/api/auth/users` 使用同结构，要求一到四个不重复的内置角色 ID，沿用 `user:create` 管理员边界和 `withAdminTransaction`。两个公开注册入口固定 member，客户端传入的 roleIds 不生效。
 
-- [ ] 失败用例覆盖非 admin 创建拒绝、用户与角色及审计事务原子性、同邮箱并发只有一次成功、空／未知／重复角色拒绝、两个公开注册入口传入管理员角色均无效；拒绝已删除账号使用的同一邮箱复用。
-- [ ] 运行 `pnpm test --runInBand tests/admin-user-create.test.ts`，确认现有后台表单仍调用公开注册的缺口。
-- [ ] 后台表单改用受保护创建接口，默认选择 member 并允许多选角色；移除后台表单的公开注册验证码依赖。事务内创建账号、关联角色和 `USER_CREATE` 审计。公开注册继续复用已经具备事务的 `registerMember`，保持自动登录；新建邮箱归一化，不批量重写已有邮箱；密码 bcrypt 哈希前校验实际 UTF-8 字节长度不超过 72 字节，前端和服务端提示一致。
-- [ ] 单元、真实库并发及浏览器创建用户回归通过；确认后台创建后仍为管理员会话、公开注册自动登录且不再取码；返回值、审计和日志不含明文或密码哈希。
+- [x] 失败用例覆盖非 admin 创建拒绝、用户与角色及审计事务原子性、同邮箱并发只有一次成功、空／未知／重复角色拒绝、两个公开注册入口传入管理员角色均无效；拒绝已删除账号使用的同一邮箱复用。
+- [x] 运行 `pnpm test --runInBand tests/admin-user-create.test.ts`，确认现有后台表单仍调用公开注册的缺口。
+- [x] 后台表单改用受保护创建接口，默认选择 member 并允许多选角色；移除后台表单的公开注册验证码依赖。事务内创建账号、关联角色和 `USER_CREATE` 审计。公开注册继续复用已经具备事务的 `registerMember`，保持自动登录；新建邮箱归一化，不批量重写已有邮箱；密码 bcrypt 哈希前校验实际 UTF-8 字节长度不超过 72 字节，前端和服务端提示一致。
+- [x] 单元、真实库并发及浏览器创建用户回归通过；确认后台创建后仍为管理员会话、公开注册自动登录且不再取码；返回值、审计和日志不含明文或密码哈希。
+
+**F08 执行记录（2026-10-26，基线 c1c8ec5）：**
+
+- 用户要求中文提交并继续：F07 以“feat(auth): 支持配置角色业务权限并记录审计日志”提交，提交前 236 项 Jest 与 TypeScript 再次通过。本轮开发 F08，按逐项验收方式保留其变更供审阅。
+- Ruling：继续在当前 dev 工作区实施，测试／构建使用临时副本与隔离数据库；本侧聊禁止子代理，按已有约定由作者自审。计划中的执行记录沿用为进度账本。
+- Pre-flight：F08 复用 F06 的管理员事务锁、F05 的角色目录和现有注册事务；后台创建和公开注册共用账号字段校验，公开注册仍固定 member 并自动登录，后台创建保持操作者会话。
+
+- 实现：新增 POST `/api/auth/users`，先校验当前 admin 和 user:create，再运行 createManagedUser。账号字段使用共享 Zod 校验，邮箱 trim／小写，密码实际 UTF-8 长度限制为 72 字节；角色必须为一到四个不重复的现存内置角色。
+- 事务：bcrypt 哈希在加锁前计算；withAdminTransaction 加锁后重新校验操作者，原子创建账号、UserRole 和 USER_CREATE 审计。已删除账号仍占用邮箱；数据库唯一索引兜底并发冲突，返回 409。返回值仅包含 id/email，审计只记录邮箱与角色，接口异常日志使用固定提示，不输出 Prisma 写入诊断。
+- 界面：提取 CreateUserForm，默认勾选普通会员、支持多选；角色加载失败可重试，创建失败保留输入和勾选，提交中禁用输入和取消。成功后关闭表单、显示提示、刷新用户列表；不调用 signIn 或公开注册接口，不请求注册验证码，管理员身份保持不变。
+- 公开注册：继续由 registerMember 为两个入口固定分配 member，忽略客户端角色；共享账号校验和密码字节提示，保留自动登录及成功后不重新取验证码。
+- RED：新增单元用例确认 POST／业务函数缺失，并复现三项超长密码被前端接受；真实 HTTP 的 POST 返回 405，浏览器复现非管理员可见添加按钮及缺少角色选择。
+- GREEN：F08 单元测试 29 项通过；相关真实库／浏览器测试 17 项通过。全量 Jest 18 套 / 265 项、认证 Playwright / 隔离 MySQL 57 项全部通过；TypeScript、差异格式检查和构建通过。lint 无错误，保留 10 项既有 Hook 依赖警告，构建字体下载重试后成功。
+- 已验证：真实同邮箱并发仅一次成功；角色写入失败与审计写入失败均回滚账号；软删除邮箱不可复用；新建账号密码可实际登录；管理员会话保持；两个公开注册入口伪造管理员角色无效；表单重试、角色必选、密码字节校验与提交中禁用均通过。
+- 测试布局：用独立 admin-user-create.spec.ts 承载 F08 数据库和表单边界；将两个旧的后台注册／验证码用例更新为管理员专用创建及普通读取者拒绝用例，公开注册和评论兼容性用例保留。
+- 已查看真实创建表单截图；按计划逐项完成作者自审，没有独立审阅者，无待修复问题。隔离库的 managed-/registration- 测试账号和 managed_ 临时触发器剩余均为零。无新增依赖或数据库迁移。
+- 证据日志：`/var/folders/wq/czh3jxv940nf6d5nqsf7yy100000gn/T/blog-f08-a88rhinw/`；F08 尚未提交，阶段三未开始。
 
 ## 阶段验收
 

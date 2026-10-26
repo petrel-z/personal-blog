@@ -4,35 +4,22 @@ import { emailKey } from '../../src/server/features/auth/identity'
 
 test.afterAll(async () => { await db.$disconnect() })
 
-test('admin add-user form refreshes after manual refresh and rejected registration', async ({ page }) => {
+test('user readers cannot open account creation even with an accidental user:create grant', async ({ page }) => {
   const email = `phase1-form-${Date.now()}@example.com`
   const user = await makeUser(email)
-  const permission = await db.permission.upsert({where:{code:'user:read'},create:{code:'user:read'},update:{}})
-  const role = await db.role.create({data:{name:`phase1-form-${Date.now()}`,rolePermissions:{create:{permissionId:permission.id}},userRoles:{create:{userId:user.id}}}})
+  const grants = await Promise.all(['user:read', 'user:create'].map(code => db.permission.upsert({where:{code},create:{code},update:{}})))
+  const role = await db.role.create({data:{name:`phase1-form-${Date.now()}`,rolePermissions:{create:grants.map(permission=>({permissionId:permission.id}))},userRoles:{create:{userId:user.id}}}})
   try {
     const request = page.context().request
     const c = await getCaptcha(request, 'login')
     expect((await login(request, {email, password:testPassword, captchaId:c.id, captchaCode:c.code})).searchParams.has('error')).toBe(false)
     let issued = 0
-    page.on('response', response => { if (response.url().includes('/api/captcha?purpose=register')) issued++ })
+    page.on('request', request => { if (request.url().includes('/api/captcha?purpose=register')) issued++ })
     await page.goto('/admin/users')
-    await page.getByRole('button', {name:'添加用户'}).click()
-    await page.getByRole('img', {name:'验证码'}).waitFor()
-    await page.getByPlaceholder('验证码', {exact:true}).fill('ABCD')
-    await page.getByRole('button', {name:'刷新验证码'}).click()
-    await expect(page.getByPlaceholder('验证码', {exact:true})).toHaveValue('')
-    await page.getByRole('img', {name:'验证码'}).waitFor()
-    const before = issued
-    await page.getByLabel('用户名', {exact:true}).fill('Form test')
-    await page.getByLabel('邮箱', {exact:true}).fill(email)
-    await page.getByLabel('密码', {exact:true}).fill(testPassword)
-    await page.getByLabel('确认密码', {exact:true}).fill(testPassword)
-    await page.getByPlaceholder('验证码', {exact:true}).fill('1111')
-    await page.getByRole('button', {name:'注册',exact:true}).click()
-    await expect.poll(() => issued).toBeGreaterThan(before)
-    await expect(page.getByPlaceholder('验证码', {exact:true})).toHaveValue('')
-    await expect(page.getByLabel('邮箱', {exact:true})).toHaveValue(email)
-    await expect(page.getByLabel('密码', {exact:true})).toHaveValue(testPassword)
+    await expect(page.getByRole('heading', {name:'用户管理',exact:true})).toBeVisible()
+    await expect(page.getByRole('button', {name:'添加用户',exact:true})).toHaveCount(0)
+    expect((await request.post('/api/auth/users', {data:'{'})).status()).toBe(403)
+    expect(issued).toBe(0)
   } finally {
     await db.role.delete({where:{id:role.id}})
     await db.user.delete({where:{id:user.id}})

@@ -11,6 +11,8 @@ function newEmail() {
 }
 
 test.afterEach(async () => {
+  const users = await db.user.findMany({ where: { email: { in: emails } }, select: { id: true } })
+  await db.auditLog.deleteMany({ where: { userId: { in: users.map(user => user.id) } } })
   await db.user.deleteMany({ where: { email: { in: emails } } })
   await db.loginAttempt.deleteMany({ where: { key: { in: emails.map(emailKey) } } })
   emails.length = 0
@@ -57,37 +59,48 @@ test('public registration signs in a member and goes home without fetching anoth
   expect(issued).toBe(before)
 })
 
-test('admin creation keeps the admin session and only refreshes captcha when opening another form', async ({ page }) => {
+test('admin creates selected-role users without captcha or changing the signed-in identity', async ({ page }) => {
   const admin = await makeUser(newEmail())
   const email = newEmail()
-  const permission = await db.permission.upsert({ where: { code: 'user:read' }, create: { code: 'user:read' }, update: {} })
-  const role = await db.role.create({ data: {
-    name: `registration-${randomUUID()}`,
-    rolePermissions: { create: { permissionId: permission.id } },
-    userRoles: { create: { userId: admin.id } },
-  } })
-  try {
-    const request = page.context().request
-    const captcha = await getCaptcha(request, 'login')
-    expect((await login(request, { email: admin.email, password: testPassword, captchaId: captcha.id, captchaCode: captcha.code })).searchParams.has('error')).toBe(false)
-    let issued = 0
-    page.on('request', request => { if (request.url().includes('/api/captcha?purpose=register')) issued++ })
-    await page.goto('/admin/users')
-    await page.getByRole('button', { name: '添加用户' }).click()
-    await fillRegistration(page, email)
-    const before = issued
-    await page.getByRole('button', { name: '注册', exact: true }).click()
-    await expect(page.getByRole('button', { name: '添加用户' })).toBeVisible()
-    expect((await (await request.get('/api/auth/session')).json()).user.id).toBe(admin.id)
-    expect(await db.user.findUnique({ where: { email } })).not.toBeNull()
-    expect(issued).toBe(before)
-    await page.getByRole('button', { name: '添加用户' }).click()
-    await page.getByRole('img', { name: '验证码' }).waitFor()
-    expect(issued).toBe(before + 1)
-    await expect(page.getByPlaceholder('验证码', { exact: true })).toHaveValue('')
-  } finally {
-    await db.role.delete({ where: { id: role.id } })
+  const roles: Record<string, string> = {}
+  for (const name of ['admin', 'editor', 'reviewer', 'member']) {
+    roles[name] = (await db.role.upsert({ where: { name }, create: { name }, update: {} })).id
   }
+  await db.userRole.create({ data: { userId: admin.id, roleId: roles.admin } })
+  const request = page.context().request
+  const captcha = await getCaptcha(request, 'login')
+  expect((await login(request, { email: admin.email, password: testPassword, captchaId: captcha.id, captchaCode: captcha.code })).searchParams.has('error')).toBe(false)
+  let issued = 0
+  let publicRegistrations = 0
+  page.on('request', request => {
+    if (request.url().includes('/api/captcha?purpose=register')) issued++
+    if (request.url().includes('/api/auth/register') || request.url().includes('/api/auth/callback/registration')) publicRegistrations++
+  })
+  await page.goto('/admin/users')
+  await page.getByRole('button', { name: '添加用户', exact: true }).click()
+  const form = page.getByRole('form', { name: '创建用户' })
+  await expect(form.getByRole('checkbox', { name: '普通会员', exact: true })).toBeChecked()
+  await expect(form.getByRole('img', { name: '验证码' })).toHaveCount(0)
+  await form.getByLabel('用户名', { exact: true }).fill('Managed user')
+  await form.getByLabel('邮箱', { exact: true }).fill(email)
+  await form.getByLabel('密码', { exact: true }).fill(testPassword)
+  await form.getByLabel('确认密码', { exact: true }).fill(testPassword)
+  await form.getByRole('checkbox', { name: '普通会员', exact: true }).uncheck()
+  await form.getByRole('checkbox', { name: '编辑者', exact: true }).check()
+  await form.getByRole('checkbox', { name: '审核者', exact: true }).check()
+  await page.screenshot({ path: test.info().outputPath('create-managed-user.png'), fullPage: true })
+  await form.getByRole('button', { name: '创建用户', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('用户创建成功')
+  await expect(form).toHaveCount(0)
+  const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: email, exact: true }) })
+  await expect(row.getByText('编辑者', { exact: true })).toBeVisible()
+  await expect(row.getByText('审核者', { exact: true })).toBeVisible()
+  expect((await (await request.get('/api/auth/session')).json()).user.id).toBe(admin.id)
+  await page.getByRole('button', { name: '添加用户', exact: true }).click()
+  await expect(form.getByRole('checkbox', { name: '普通会员', exact: true })).toBeChecked()
+  await expect(form.getByLabel('密码', { exact: true })).toHaveValue('')
+  expect(issued).toBe(0)
+  expect(publicRegistrations).toBe(0)
 })
 
 test('duplicate public registration refreshes captcha and never signs in as the existing account', async ({ page }) => {
@@ -123,3 +136,36 @@ test('automatic sign-in requires a fresh registration captcha, never a login cap
   expect(await db.user.findUnique({ where: { email: otherEmail } })).toBeNull()
   expect((await (await request.get('/api/auth/session')).json()).user.email).toBe(email)
 })
+
+for (const entry of ['api', 'provider']) {
+  test(`public ${entry} registration ignores forged administrator roles`, async ({ request }) => {
+    const admin = await db.role.upsert({ where: { name: 'admin' }, create: { name: 'admin' }, update: {} })
+    const email = newEmail()
+    const captcha = await getCaptcha(request, 'register')
+    const data = { name: 'Public user', email, password: testPassword, captchaId: captcha.id, captchaCode: captcha.code,
+      roleIds: [admin.id], roles: ['admin'], isAdmin: true }
+    if (entry === 'api') {
+      expect((await request.post('/api/auth/register', { data })).status()).toBe(201)
+    } else {
+      const result = await registerAndSignIn(request, { ...data, roleIds: JSON.stringify(data.roleIds), roles: 'admin', isAdmin: 'true' })
+      expect(result.searchParams.has('error')).toBe(false)
+    }
+    const user = await db.user.findUniqueOrThrow({ where: { email }, include: { userRoles: { include: { role: true } } } })
+    expect(user.userRoles.map(link => link.role.name)).toEqual(['member'])
+    expect((await request.get('/api/auth/users')).status()).toBe(entry === 'api' ? 401 : 403)
+  })
+  test(`public ${entry} registration rejects passwords exceeding 72 bytes`, async ({ request }) => {
+    const email = newEmail()
+    const captcha = await getCaptcha(request, 'register')
+    const data = { name: 'Public user', email, password: '中'.repeat(25), captchaId: captcha.id, captchaCode: captcha.code }
+    if (entry === 'api') {
+      const response = await request.post('/api/auth/register', { data })
+      expect(response.status()).toBe(400)
+      expect((await response.json()).message).toContain('72字节')
+    } else {
+      expect((await registerAndSignIn(request, data)).searchParams.get('code')).toBe('registration_invalid')
+    }
+    expect(await db.user.findUnique({ where: { email } })).toBeNull()
+    expect(await (await request.get('/api/auth/session')).json()).toBeNull()
+  })
+}

@@ -57,6 +57,7 @@ export default function AuditLogsPage() {
 
   const formatAction = (action: string) => {
     const actionMap: Record<string, string> = {
+      'USER_CREATE': '创建后台用户',
       'USER_ROLE_UPDATE': '调整用户角色',
       'ROLE_PERMISSION_UPDATE': '调整角色权限',
       'POST_CREATE': '创建',

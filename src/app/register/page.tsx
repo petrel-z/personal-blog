@@ -177,7 +177,7 @@ export default function RegisterPage() {
               <input
                 id="password"
                 type="password"
-                placeholder="至少6位"
+                placeholder="至少6位，最多72字节"
                 className={clsx(
                   'w-full px-3 py-2 border rounded-lg bg-background',
                   'focus:outline-none focus:ring-2 focus:ring-primary/50',
