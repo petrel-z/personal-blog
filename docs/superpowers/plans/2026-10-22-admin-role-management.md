@@ -1,6 +1,6 @@
 # 后台角色管理 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-26 用户要求“提交并继续”；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已提交为 `091daaf`；F06 已完成并保留未提交修改，F07、F08 尚未开始。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-26 用户要求“提交并继续”；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已提交为 `091daaf`；F06 已提交为 `82dca4b`，F07 已完成并验收、尚未提交，F08 尚未开始。
 
 **Goal:** 让管理员在后台查看用户角色、分配角色、维护业务权限并创建指定角色的用户。
 
@@ -19,8 +19,8 @@
 | F05.1（已提交 473a0f5） | 统一角色、权限目录和管理边界 | 四种角色规则一致；初始化不覆盖已配置授权；仅 admin 能管理授权 | 阶段一 |
 | F05.2（已提交 ccbece7） | 用户列表展示角色 | 每个用户显示一个或多个中文角色标签，无角色显示“未分配” | F05.1 |
 | F05.3（已提交 091daaf） | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
-| F06（已完成，未提交） | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
-| F07 | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
+| F06（已提交 82dca4b） | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
+| F07（已验收，待提交） | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
 | F08 | 后台创建指定角色用户 | 创建时选择角色，账号与角色一起成功；当前管理员保持登录；写入审计 | F06 |
 
 按表格顺序交付，每项包含必要的前端、服务端和验收，不拆成只能展示但没有鉴权的半成品。F05.2 与 F05.3 在接口确定后逻辑上独立；本侧聊按顺序实施。
@@ -142,14 +142,28 @@
 
 ### F07：配置编辑者与审核者权限
 
-**Files:** 新增 `src/app/api/auth/roles/[id]/permissions/route.ts`；修改 `RoleManager.tsx`、`src/server/features/auth/role.service.ts`、审计动作目录与审计页中文动作名；新增 `tests/role-permissions.test.ts`，扩展 `tests/setup-auth.test.ts`、`tests/integration/admin-membership.spec.ts` 和角色浏览器测试。
+**Files:** 新增 `src/app/api/auth/roles/[id]/permissions/route.ts`、`RolePermissionEditor.tsx`；修改 `RoleManager.tsx`、`src/server/features/auth/role.service.ts`、审计动作目录与审计页中文动作名；新增 `tests/role-permissions.test.ts` 和 `tests/integration/role-permissions.spec.ts`；复用现有初始化、角色展示及用户角色分配回归。
 
 **Interfaces:** `replaceRolePermissions(actor: Actor, roleId: string, codes: Permission[]): Promise<void>`；PATCH `/api/auth/roles/:id/permissions` 请求 `{permissions: Permission[]}`，沿用 F05.1 的 `role:update` 边界及 F06 的 `withAdminTransaction`。editor/reviewer 可选现有业务权限，排除四项管理权限；空数组表示撤销该角色全部后台业务权限，重复或未知码返回 400。
 
-- [ ] 失败测试：admin/member 权限不可更改；unknown code 拒绝；禁用 editor 的 post:update 后同一会话下一次请求拒绝；再次 setup 不恢复被撤销的权限。
-- [ ] 运行 `pnpm test --runInBand tests/role-permissions.test.ts tests/setup-auth.test.ts tests/authorization.test.ts`，确认新增行为先失败。
-- [ ] 实现分组勾选与保存；事务内重新核对 admin 身份、更新授权并写 `ROLE_PERMISSION_UPDATE` 审计。初始化沿用 F05.1 的不覆盖规则；admin 的有效权限始终由完整权限目录决定。保存后刷新角色数据；操作者若更新自己的授权展示，刷新服务端页面数据。
-- [ ] 测试通过，浏览器验证刷新后权限仍保存；验证空业务权限会清楚显示不能进入后台，角色页没有删除 admin/member 或编辑其权限的操作。
+- [x] 失败测试：admin/member 权限不可更改；unknown code 拒绝；禁用 editor 的 post:update 后同一会话下一次请求拒绝；再次 setup 不恢复被撤销的权限。
+- [x] 运行新增 Jest 测试，确认缺少 PATCH 模块；隔离副本真实 HTTP 返回 405、浏览器缺少编辑入口。实现后运行权限、初始化、授权三组单元测试，48 项通过。
+- [x] 实现分组勾选与保存；事务内重新核对 admin 身份、更新授权并写 `ROLE_PERMISSION_UPDATE` 审计。初始化沿用 F05.1 的不覆盖规则；admin 的有效权限始终由完整权限目录决定。保存后刷新角色数据与服务端页面数据。
+- [x] 测试通过，浏览器验证刷新后权限仍保存；验证空业务权限会清楚显示不能进入后台，角色页没有删除 admin/member 或编辑其权限的操作。
+
+**F07 执行记录（2026-10-26，基线 82dca4b）：**
+
+- 用户本轮要求“提交，继续下一步”；F06 提交前重新验证 212 项 Jest 和 TypeScript 均通过。当前范围为 F07，完成后按用户要求讲解实现与代码链路，F08 留待下一项。
+- Ruling：沿用当前 dev 工作区；本侧聊禁止子代理，由作者独立自审。浏览器与构建使用临时副本及隔离数据库，避免影响现有开发服务。
+- Pre-flight：F07 复用 F06 的 withAdminTransaction 和 F05 的权限目录／管理员边界；权限替换仅接受 editor/reviewer 和业务权限，初始化不覆盖授权的规则保持不变。
+- 实现：按共享目录展示 17 项业务权限并排除四项管理员权限；新增独立编辑组件管理勾选、错误和保存状态。保存中禁用勾选、取消和角色切换；失败保留勾选；切换角色或取消时丢弃未保存内容；成功重新获取角色并执行 router.refresh。
+- 服务端：Zod 校验角色 ID、权限白名单与重复码；admin/member 或不支持的旧角色返回 409，缺失角色 404。复用管理员行锁并在事务内重读操作者身份；角色权限完整替换与 ROLE_PERMISSION_UPDATE 审计原子提交。相同选择不重复写审计，保存会清理历史无效／误授管理权限码。
+- 并发语义：授权写入串行执行，后一次提交的完整权限集合生效；审计 before 从事务中的真实数据读取，保持连续变更链。沿用 getActor 每次读取数据库授权，撤权无需退出重登。
+- 测试布局调整：新建独立的 role-permissions.spec.ts，避免继续扩充 F06 文件；通过真实 API 撤权后运行 setupAuthorization，验证初始化不会恢复授权，无需改写已有初始化 mock 测试。
+- 验证：Jest 17 套 / 236 项通过（F07 新增 24 项）；认证 Playwright / 隔离 MySQL 全量 46 项通过（F07 新增 6 项），覆盖同一会话即时撤权、再次初始化、审计故障真实回滚、并发审计链、界面保存／刷新／清空／重试／切换与提交中禁用。
+- TypeScript、差异格式检查及构建通过；lint 无错误，保留 10 项既有 Hook 依赖警告；构建中字体下载自动重试后成功。
+- 已查看真实浏览器截图并按权限边界、事务原子性、界面状态与计划范围完成作者自审，无待修复问题；未使用独立审阅者。隔离库中的 F07 临时账号、审计故障触发器剩余均为零，角色授权由测试清理恢复。
+- 日志位于 `/var/folders/wq/czh3jxv940nf6d5nqsf7yy100000gn/T/blog-f07-ffspovoa/`。F07 工作区变更待审阅，F08 尚未开始；无数据库结构变更或新增依赖。
 
 ### F08：后台新增用户及指定角色
 

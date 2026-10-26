@@ -82,6 +82,7 @@ export async function getAuditLogById(id: string) {
 // Action types for common admin operations
 export const AuditAction = {
   USER_ROLE_UPDATE: 'USER_ROLE_UPDATE',
+  ROLE_PERMISSION_UPDATE: 'ROLE_PERMISSION_UPDATE',
   // Posts
   POST_CREATE: 'POST_CREATE',
   POST_UPDATE: 'POST_UPDATE',

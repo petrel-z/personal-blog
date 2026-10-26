@@ -1,17 +1,25 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { clsx } from 'clsx'
 import { api } from '@/client/api'
 import { PERMISSION_DEFINITIONS, type Permission } from '@/shared/permissions'
 import { ROLE_DEFINITIONS } from '@/shared/roles'
 import type { BuiltinRoleName, RoleSummary } from '@/shared/types/authorization'
+import { useAuth } from '../../../_components'
+import { RolePermissionEditor } from './RolePermissionEditor'
 
 export default function RoleManager() {
+  const router = useRouter()
+  const { can } = useAuth()
   const [roles, setRoles] = useState<RoleSummary[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const loadRoles = useCallback(async () => {
     setLoading(true)
@@ -22,12 +30,14 @@ export default function RoleManager() {
         setRoles([])
         setError(result.code === 4010 ? '登录已失效，请重新登录' : result.code === 4030
           ? '当前账号没有查看角色的权限' : '获取角色列表失败，请稍后重试')
-        return
+        return false
       }
       setRoles(result.data)
+      return true
     } catch {
       setRoles([])
       setError('获取角色列表失败，请稍后重试')
+      return false
     } finally {
       setLoading(false)
     }
@@ -48,8 +58,9 @@ export default function RoleManager() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">角色管理</h1>
-        <p className="mt-1 text-sm text-muted-foreground">查看角色的成员数量和当前生效的后台权限</p>
+        <p className="mt-1 text-sm text-muted-foreground">查看角色成员与权限，配置编辑者和审核者的业务权限</p>
       </div>
+      {notice && !loading && !error && <p role="status" className="text-sm text-green-700">{notice}</p>}
 
       {loading ? (
         <p role="status" className="py-12 text-center text-muted-foreground">正在加载角色...</p>
@@ -75,9 +86,10 @@ export default function RoleManager() {
                   <button
                     key={role.id}
                     type="button"
+                    disabled={saving}
                     aria-pressed={selectedRole.id === role.id}
-                    onClick={() => setSelectedId(role.id)}
-                    className={clsx('flex w-full items-center justify-between gap-3 rounded-lg border p-4 text-left',
+                    onClick={() => { setSelectedId(role.id); setEditingId(null); setNotice(null) }}
+                    className={clsx('flex w-full items-center justify-between gap-3 rounded-lg border p-4 text-left disabled:opacity-50',
                       selectedRole.id === role.id ? 'border-primary bg-primary/10' : 'bg-card hover:bg-accent/50')}
                   >
                     <span className="font-medium">{ROLE_DEFINITIONS[role.name].label}</span>
@@ -98,9 +110,22 @@ export default function RoleManager() {
                     {selectedRole.description || ROLE_DEFINITIONS[selectedRole.name].description}
                   </p>
                   <p className="text-sm">有效成员：{selectedRole.memberCount} 人</p>
+                  {can('role:update') && (selectedRole.name === 'editor' || selectedRole.name === 'reviewer') && editingId !== selectedRole.id && (
+                    <button type="button" onClick={() => { setEditingId(selectedRole.id); setNotice(null) }}
+                      className="rounded-lg border px-3 py-1.5 text-sm hover:bg-accent">编辑权限</button>
+                  )}
                 </div>
 
                 <div className="border-t pt-5">
+                  {editingId === selectedRole.id ? (
+                    <RolePermissionEditor key={selectedRole.id} role={selectedRole} saving={saving}
+                      onSavingChange={setSaving} onCancel={() => setEditingId(null)}
+                      onSaved={async () => {
+                        setEditingId(null)
+                        if (await loadRoles()) setNotice(`${ROLE_DEFINITIONS[selectedRole.name].label}权限已更新`)
+                        router.refresh()
+                      }} />
+                  ) : <>
                   <h3 className="mb-4 font-medium">后台权限（{selectedRole.permissions.length}）</h3>
                   {groups.size === 0 ? (
                     <p className="text-sm text-muted-foreground">该角色暂无后台权限</p>
@@ -116,6 +141,7 @@ export default function RoleManager() {
                       ))}
                     </div>
                   )}
+                  </>}
                 </div>
               </section>
             </div>
