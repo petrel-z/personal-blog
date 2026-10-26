@@ -1,6 +1,6 @@
 # 后台角色管理 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-23 用户要求提交 F05.2 后继续；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已完成并保留未提交修改，其余三项尚未开始。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 当前侧聊禁止子代理，按顺序自行实施与检查。2026-10-26 用户要求“提交并继续”；F05.1 已提交为 `473a0f5`，F05.2 已提交为 `ccbece7`，F05.3 已提交为 `091daaf`；F06 已完成并保留未提交修改，F07、F08 尚未开始。
 
 **Goal:** 让管理员在后台查看用户角色、分配角色、维护业务权限并创建指定角色的用户。
 
@@ -18,8 +18,8 @@
 | --- | --- | --- | --- |
 | F05.1（已提交 473a0f5） | 统一角色、权限目录和管理边界 | 四种角色规则一致；初始化不覆盖已配置授权；仅 admin 能管理授权 | 阶段一 |
 | F05.2（已提交 ccbece7） | 用户列表展示角色 | 每个用户显示一个或多个中文角色标签，无角色显示“未分配” | F05.1 |
-| F05.3（已完成，未提交） | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
-| F06 | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
+| F05.3（已提交 091daaf） | 角色列表与权限展示 | 新增“角色管理”入口，展示说明、有效成员数量、按模块分组的权限 | F05.1 |
+| F06（已完成，未提交） | 为用户分配角色 | 管理员勾选角色并保存；最后一位有效管理员不能被移除；写入审计 | F05.2、F05.3 |
 | F07 | 配置角色业务权限 | 可修改 editor/reviewer 的权限；保存后下一次请求生效；写入审计 | F05.3、F06 的事务保护 |
 | F08 | 后台创建指定角色用户 | 创建时选择角色，账号与角色一起成功；当前管理员保持登录；写入审计 | F06 |
 
@@ -119,14 +119,26 @@
 
 ### F06：分配用户角色与最后管理员保护
 
-**Files:** 新增 `src/server/features/auth/user.service.ts`、`src/server/features/auth/admin-transaction.ts`、`src/app/api/auth/users/[id]/roles/route.ts`；修改用户页、`src/server/features/audit-log/audit-log.service.ts`、`src/app/(admin)/admin/audit-logs/page.tsx`；新增 `tests/user-role.test.ts`、`tests/integration/admin-membership.spec.ts`，扩展角色浏览器测试。
+**Files:** 新增 `src/server/features/auth/user.service.ts`、`src/server/features/auth/admin-transaction.ts`、`src/app/api/auth/users/[id]/roles/route.ts`、`src/app/(admin)/admin/users/_components/UserRoleEditor.tsx`；修改用户页、`src/server/features/audit-log/audit-log.service.ts`、`src/app/(admin)/admin/audit-logs/page.tsx`；新增 `tests/user-role.test.ts`、`tests/integration/admin-membership.spec.ts`，扩展角色浏览器测试。
 
 **Interfaces:** `replaceUserRoles(actor: Actor, userId: string, roleIds: string[]): Promise<void>`；PATCH `/api/auth/users/:id/roles` 请求 `{roleIds: string[]}`，只接受零到四个不重复的内置角色 ID；沿用 F05.1 的 `withAdminPermission('user:assign-role', ...)`。`withAdminTransaction<T>(actor: Actor, operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T>` 统一锁定 admin Role 行并在事务中复核操作者仍为有效 admin，供 F06–F08 的所有管理写入复用。
 
-- [ ] 失败用例覆盖非 admin 403、未知／重复角色 400、已删除或不存在账号 404、最后 admin 409、普通用户可清空角色、审计失败全部回滚；真实库并发用例断言两个移除请求至多一个成功。
-- [ ] 运行 `pnpm test --runInBand tests/user-role.test.ts`，确认预期失败。
-- [ ] 实现角色选择和确认保存；所有管理写入先锁同一 admin Role 行，再核对操作者当前 admin 身份和有效成员数量，最后替换关系并写 `USER_ROLE_UPDATE` 审计，包含角色变更前后值；补齐审计页中文动作名。
-- [ ] 单元、浏览器角色选择回归及 `pnpm exec playwright test --config=playwright.auth.config.ts tests/integration/admin-membership.spec.ts` 通过；确认已有登录用户下一次请求按新角色授权。
+- [x] 失败用例覆盖非 admin 403、未知／重复角色 400、已删除或不存在账号 404、最后 admin 409、普通用户可清空角色、审计失败全部回滚；真实库并发用例断言两个移除请求至多一个成功。
+- [x] 运行 `pnpm test --runInBand tests/user-role.test.ts`，确认预期失败。
+- [x] 实现角色选择和确认保存；所有管理写入先锁同一 admin Role 行，再核对操作者当前 admin 身份和有效成员数量，最后替换关系并写 `USER_ROLE_UPDATE` 审计，包含角色变更前后值；补齐审计页中文动作名。
+- [x] 单元、浏览器角色选择回归及 `pnpm exec playwright test --config=playwright.auth.config.ts tests/integration/admin-membership.spec.ts` 通过；确认已有登录用户下一次请求按新角色授权。
+
+**执行记录（2026-10-26，基线 091daaf）：**
+
+- 按用户“提交并继续”指令，在 dev 将 F05.3 提交为 `091daaf`，提交前复跑 193 项单元测试和 TypeScript 检查；随后完成 F06。沿用逐项验收方式，F06 修改保留工作区，未开始 F07/F08。
+- 用户列表仅对管理员显示“分配角色”，弹窗允许多选或清空，包含加载失败重试、旧角色移除说明、撤销自身管理员的提示和保存失败保留选项。成功后刷新列表和服务端权限；撤销自身管理员不会替换或退出当前登录会话。
+- PATCH 接口在解析请求前校验 admin 身份与 user:assign-role；服务层再次验证输入和身份。ReadCommitted 事务先锁定 admin Role 行，取得锁后重读操作者、目标和有效管理员数量；替换关系与包含操作者、目标、前后角色值的 USER_ROLE_UPDATE 审计一起提交，无实际变化时不重复写审计。
+- RED：新增单元测试最初因路由模块不存在失败；服务端实现后 19 项通过。浏览器测试随后因用户列表缺少“分配角色”按钮失败，接入弹窗后通过。
+- 回滚测试初验发现 MySQL 不支持通过 Prisma 预处理查询创建触发器，改用 `prisma db execute --stdin` 在隔离库创建仅匹配当前测试目标的临时触发器，并在 finally 删除；真实审计写入错误返回 500，角色关系保持原值，未留下审计记录。
+- 真实并发验收：两个管理员互相撤权时结果为 200/403；同时各自撤权时结果为 200/409；两种情况最终均保留一个有效管理员。软删除管理员不计数。覆盖已登录目标立即失权、非管理员入口隐藏、非法输入不写入、无变化不重复审计、清空角色、错误恢复及自身撤权后的页面刷新。
+- 完整回归：Jest 16 套 / 212 项通过；认证 Playwright / 隔离 MySQL 40 项通过，其中 F06 新增 9 项；TypeScript 和差异格式检查通过。`pnpm lint` 无错误，保留 10 项既有 Hook 依赖警告。`pnpm build` 遇到 Google Fonts 下载超时后自动重试，最终构建通过。
+- 隔离库清理复核：本项测试用户和临时审计触发器剩余数量均为零。
+- 已查看真实浏览器截图并完成作者自审。实现直接在当前 dev；浏览器测试和构建使用临时副本、3017 端口和隔离数据库，避免影响现有开发服务。未使用子代理，未修改应用数据库，未添加依赖或数据库迁移。
 
 ### F07：配置编辑者与审核者权限
 

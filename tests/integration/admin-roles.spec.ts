@@ -84,6 +84,7 @@ for (const mode of ['admin', 'reader'] as const) {
     await expect(row(unassigned.email).getByText('未分配', { exact: true })).toBeVisible()
     await expect(row(legacyUser.email).getByText(legacy.name, { exact: true })).toBeVisible()
     if (mode === 'admin') await expect(row(viewer.email).getByText('管理员', { exact: true })).toBeVisible()
+    else await expect(page.getByRole('button', { name: /^分配角色：/ })).toHaveCount(0)
 
     const response = await request.get('/api/auth/users')
     expect(response.status()).toBe(200)

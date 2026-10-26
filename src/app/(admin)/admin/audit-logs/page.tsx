@@ -57,6 +57,7 @@ export default function AuditLogsPage() {
 
   const formatAction = (action: string) => {
     const actionMap: Record<string, string> = {
+      'USER_ROLE_UPDATE': '调整用户角色',
       'POST_CREATE': '创建',
       'POST_UPDATE': '更新',
       'POST_DELETE': '删除',

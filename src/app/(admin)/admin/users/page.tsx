@@ -3,6 +3,7 @@
 import { useCaptcha } from '@/client/hooks/useCaptcha'
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { clsx } from 'clsx'
@@ -12,6 +13,7 @@ import { registerSchema, type RegisterInput } from '@/shared/validations'
 import { ROLE_DEFINITIONS } from '@/shared/roles'
 import type { BuiltinRoleName } from '@/shared/types/authorization'
 import { CaptchaInput } from '../../_components/CaptchaInput'
+import { UserRoleEditor } from './_components/UserRoleEditor'
 
 interface User {
   id: string
@@ -26,7 +28,11 @@ interface User {
 }
 
 export default function UsersPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, can, user: currentUser } = useAuth()
+  const router = useRouter()
+  const canAssignRoles = can('user:assign-role')
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [roleSuccess, setRoleSuccess] = useState<string | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -291,6 +297,7 @@ export default function UsersPage() {
       )}
 
       {/* Users Table */}
+      {roleSuccess && <p role="status" className="text-sm text-green-700">{roleSuccess}</p>}
       <div className="border rounded-lg overflow-x-auto">
         <table className="w-full">
           <thead className="bg-sidebar">
@@ -300,12 +307,13 @@ export default function UsersPage() {
               <th className="px-4 py-3 text-left text-sm font-medium">角色</th>
               <th className="px-4 py-3 text-left text-sm font-medium">文章数</th>
               <th className="px-4 py-3 text-left text-sm font-medium">注册时间</th>
+              {canAssignRoles && <th className="px-4 py-3 text-left text-sm font-medium">操作</th>}
             </tr>
           </thead>
           <tbody className="divide-y">
             {users.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={canAssignRoles ? 6 : 5} className="px-4 py-8 text-center text-muted-foreground">
                   {error ? '用户列表暂不可用' : '暂无用户'}
                 </td>
               </tr>
@@ -346,12 +354,36 @@ export default function UsersPage() {
                   <td className="px-4 py-3 text-muted-foreground text-sm">
                     {new Date(user.createdAt).toLocaleDateString('zh-CN')}
                   </td>
+                  {canAssignRoles && (
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        aria-label={`分配角色：${user.email}`}
+                        onClick={() => { setRoleSuccess(null); setEditingUser(user) }}
+                        className="whitespace-nowrap text-sm text-primary hover:underline"
+                      >分配角色</button>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+      {canAssignRoles && editingUser && (
+        <UserRoleEditor
+          key={editingUser.id}
+          user={editingUser}
+          isSelf={editingUser.id === currentUser?.id}
+          onClose={() => setEditingUser(null)}
+          onSaved={() => {
+            setEditingUser(null)
+            setRoleSuccess('角色已更新')
+            void fetchUsers()
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }
