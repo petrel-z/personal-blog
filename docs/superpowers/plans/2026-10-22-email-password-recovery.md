@@ -1,6 +1,6 @@
 # 邮箱验证码找回密码 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已提交为 `327e86b`；2026-10-27 完成 F11 隔离验收并按用户指示快进合入 `dev`（`d4d8d54`），本地数据库结构已同步。后续直接在 `dev` 逐项开发，不创建功能分支／工作树。真实邮件环境待配置；侧聊禁止子代理，由作者顺序实施与自审，F12 页面与隔离浏览器流程已完成，真实邮件环境仍待配置。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已提交为 `327e86b`；2026-10-27 完成 F11 隔离验收并按用户指示快进合入 `dev`（`d4d8d54`），本地数据库结构已同步。后续直接在 `dev` 逐项开发，不创建功能分支／工作树。侧聊禁止子代理，由作者顺序实施与自审。F12 页面与隔离浏览器流程已完成并提交至 `dev`（`5a8bb06`）；真实 SMTP 与签名密钥已配置并检查通过，用户已确认实际走通邮件验证码重置密码流程。
 
 **Goal:** 用户通过注册邮箱接收 6 位验证码，设置新密码并撤销旧会话。
 
@@ -129,7 +129,7 @@
 - 发送和确认各自显示服务端限流倒计时；仅将截止时间保存在浏览器本地存储，刷新不保存邮箱／验证码／密码，存储不可用仍可完成恢复。同步请求锁防止快速重复提交，失败时刷新图片验证码并允许重试。
 - 9 项浏览器测试全部先观察失败后通过；使用实际本机 TLS SMTP 捕获邮件、真实隔离 MySQL 与独立应用验证管理员完整找回和登录。未知邮件服务配置不伪造成功。测试框架 MIME 解码与路由播报器选择器问题已修正。
 - 346 项 Jest、原有 86 项认证回归、TypeScript 和 lint 通过；移动端截图已检查。生产构建因既有 Inter 字体下载超时失败，待网络恢复后重跑；完整过程和证据见 [F12 执行记录](./2026-10-27-phase12-execution.md)。
-- 当前本地 3000 服务已呈现入口和页面。真实 SMTP、AUTH_CODE_SECRET 尚未配置，用户真实邮箱的投递仍需另外验收。
+- 本地 3000 服务已呈现入口和页面。2026-10-27 补充验收：Gmail SMTP 连接与认证通过，AUTH_CODE_SECRET 配置检查通过；用户确认已实际走通邮件验证码重置密码流程。SMTP 连接检查本身未发送邮件，实际流程验收依据为用户反馈。
 
 ## 阶段验收
 
