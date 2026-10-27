@@ -19,6 +19,7 @@ export { PostStatus, CommentStatus }
 // Session user type (extends NextAuth types)
 export interface SessionUser {
   id: string
+  sessionVersion: number
   email: string
   name?: string | null
   image?: string | null

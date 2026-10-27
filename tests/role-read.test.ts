@@ -22,14 +22,14 @@ const row = (name: string, codes: string[] = [], memberCount = 0) => ({
   rolePermissions: codes.map(code => ({ permission: { code } })),
 })
 const viewer = (name: string, codes: string[] = []) => ({
-  id: 'viewer', deletedAt: null,
+  id: 'viewer', sessionVersion: 0, deletedAt: null,
   userRoles: [{ role: { name, rolePermissions: codes.map(code => ({ permission: { code } })) } }],
 })
 const request = () => GET(new Request('http://localhost/api/auth/roles'), { params: {} })
 
 beforeEach(() => {
   jest.resetAllMocks()
-  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'viewer' } })
+  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'viewer', sessionVersion: 0 } })
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(viewer('admin'))
   ;(redirect as unknown as jest.Mock).mockImplementation((url: string) => { throw new Error(`REDIRECT:${url}`) })
 })
@@ -70,7 +70,7 @@ test.each([
 
 test.each([
   { session: null, record: null, status: 401, destination: '/login' },
-  { session: { user: { id: 'viewer' } }, record: viewer('legacy-reader', ['user:read', 'role:read']), status: 403, destination: '/forbidden' },
+  { session: { user: { id: 'viewer', sessionVersion: 0 } }, record: viewer('legacy-reader', ['user:read', 'role:read']), status: 403, destination: '/forbidden' },
 ])('API and server page deny unauthorized readers before role queries ($status)', async ({ session, record, status, destination }) => {
   ;(auth as jest.Mock).mockResolvedValue(session)
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(record)

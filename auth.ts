@@ -7,6 +7,7 @@ import { runLoginAttempt } from '@/server/features/auth/login-attempt.service'
 import { emailKey, normalizeEmail } from '@/server/features/auth/identity'
 import { consumeCaptcha } from '@/server/features/auth/captcha.service'
 import { registerMember, RegistrationError } from '@/server/features/auth/registration.service'
+import { isSessionCurrent } from '@/server/features/auth/session-version.service'
 
 class CaptchaError extends CredentialsSignin { code = 'captcha' }
 class LoginLocked extends CredentialsSignin {
@@ -50,7 +51,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const hashValid = !!user && /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(user.password)
             const valid = await bcrypt.compare(password, hashValid ? user!.password : dummyPasswordHash)
             if (!user || user.deletedAt || !hashValid || !valid) return null
-            return { id: user.id, email: user.email, name: user.name }
+            return { id: user.id, email: user.email, name: user.name, sessionVersion: user.sessionVersion }
           })
           if (result.kind === 'locked') throw new LoginLocked(result.retryAfterSeconds)
           return result.kind === 'success' ? result.user : null
@@ -76,7 +77,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           // Auth.js creates the session for this new account after registration succeeds.
           const user = await registerMember(credentials)
-          return { id: user.id, email: user.email, name: user.name }
+          return { id: user.id, email: user.email, name: user.name, sessionVersion: user.sessionVersion }
         } catch (error) {
           if (error instanceof RegistrationError) throw new RegistrationSignInError(error.reason)
           console.error('Registration service unavailable')
@@ -89,12 +90,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.sessionVersion = user.sessionVersion
       }
-      return token
+      // Client update payloads never choose the version; compare the signed snapshot.
+      return await isSessionCurrent(token.id, token.sessionVersion) ? token : null
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
+        session.user.sessionVersion = token.sessionVersion
       }
       return session
     },

@@ -40,7 +40,7 @@ export async function registerMember(input: unknown) {
       })
       return tx.user.create({
         data: { name, email, password: hashedPassword, userRoles: { create: { roleId: role.id } } },
-        select: { id: true, name: true, email: true, createdAt: true },
+        select: { id: true, name: true, email: true, createdAt: true, sessionVersion: true },
       })
     })
   } catch (error) {

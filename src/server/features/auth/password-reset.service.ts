@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { isIP } from 'node:net'
 import { z } from 'zod'
 import { prisma } from '@/server/db'
 import type { MailTransport } from '@/server/mail/types'
@@ -10,13 +9,15 @@ import { authDigest, emailKey, normalizeEmail } from './identity'
 import { consumeQuota } from './rate-limit.service'
 import { generateResetCode, hashResetCode, readResetCodeSecret } from './password-reset-code'
 import { PasswordResetError } from './password-reset-error'
+import { resetIpSchema } from './password-reset-input'
+
+export { confirmPasswordReset } from './password-reset-confirm.service'
 
 const requestSchema = z.object({
   email: z.string().trim().email().max(254).transform(normalizeEmail),
   captchaId: z.string().min(1).max(64),
   captchaCode: z.string().regex(/^[a-z0-9]{4}$/i),
-  ip: z.string().max(64).transform(value => isIP(value) === 6 && !value.includes('%')
-    ? new URL(`http://[${value}]/`).hostname.slice(1, -1) : isIP(value) === 4 ? value : 'unknown'),
+  ip: resetIpSchema,
 })
 
 const resendSeconds = 60

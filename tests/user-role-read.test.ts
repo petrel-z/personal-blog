@@ -7,7 +7,7 @@ import { GET } from '@/app/api/auth/users/route'
 
 function actor(role: string, permissions: string[] = []) {
   return {
-    id: 'viewer', deletedAt: null,
+    id: 'viewer', sessionVersion: 0, deletedAt: null,
     userRoles: [{ role: { name: role, rolePermissions: permissions.map(code => ({ permission: { code } })) } }],
   }
 }
@@ -16,7 +16,7 @@ const request = () => GET(new Request('http://localhost/api/auth/users'), { para
 
 beforeEach(() => {
   jest.resetAllMocks()
-  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'viewer' } })
+  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'viewer', sessionVersion: 0 } })
 })
 
 test.each([
@@ -51,7 +51,7 @@ test.each([
 
 test.each([
   { session: null, viewer: null, status: 401 },
-  { session: { user: { id: 'viewer' } }, viewer: actor('editor', ['post:read']), status: 403 },
+  { session: { user: { id: 'viewer', sessionVersion: 0 } }, viewer: actor('editor', ['post:read']), status: 403 },
 ])('unauthorized readers get $status before querying the user list', async ({ session, viewer, status }) => {
   ;(auth as jest.Mock).mockResolvedValue(session)
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(viewer)

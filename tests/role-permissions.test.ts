@@ -39,15 +39,15 @@ beforeEach(() => {
   stored = ['post:read', 'post:update']
   audit = []
   tx = transaction()
-  ;(auth as jest.Mock).mockResolvedValue({ user: { id: actor.id } })
-  ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: actor.id, deletedAt: null,
+  ;(auth as jest.Mock).mockResolvedValue({ user: { id: actor.id, sessionVersion: 0 } })
+  ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: actor.id, sessionVersion: 0, deletedAt: null,
     userRoles: [{ role: { name: 'admin', rolePermissions: [] } }] })
   ;(prisma.$transaction as jest.Mock).mockImplementation(operation => operation(tx))
 })
 
 test.each([401, 403])('denies unauthorized requests before parsing or changing permissions (%i)', async status => {
   if (status === 401) (auth as jest.Mock).mockResolvedValue(null)
-  else (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: actor.id, deletedAt: null,
+  else (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: actor.id, sessionVersion: 0, deletedAt: null,
     userRoles: [{ role: { name: 'editor', rolePermissions: [{ permission: { code: 'role:update' } }] } }] })
   const response = await request('{')
   expect(response.status).toBe(status)

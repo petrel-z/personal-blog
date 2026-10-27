@@ -1,6 +1,6 @@
 # 邮箱验证码找回密码 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已完成隔离验收、尚未提交；应用库及真实邮件环境待配置。侧聊禁止子代理，由作者顺序实施与自审；F11–F12 留待后续小功能。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已提交为 `327e86b`；2026-10-27 在 `codex/password-reset-confirm` 完成 F11 隔离验收。应用库及真实邮件环境待配置；侧聊禁止子代理，由作者顺序实施与自审，F12 留待下一小功能。
 
 **Goal:** 用户通过注册邮箱接收 6 位验证码，设置新密码并撤销旧会话。
 
@@ -30,7 +30,7 @@
 ## File Structure
 
 - `src/server/mail/{config,types,transport,templates}.ts` 分别负责环境校验、传输接口、SMTP 实现和邮件内容。
-- `src/server/features/auth/password-reset.service.ts` 负责申请和消费；复用 F04 `identity.ts`、`rate-limit.service.ts`。
+- `src/server/features/auth/password-reset.service.ts` 负责申请并导出消费接口，`password-reset-confirm.service.ts` 单独实现消费，`password-reset-input.ts` 共享来源 IP 规则；复用 F04 `identity.ts`、`rate-limit.service.ts`。
 - `src/app/api/auth/password-reset/{request,confirm}/route.ts` 提供 API；`src/app/forgot-password/page.tsx` 提供单页两步交互。
 - Prisma 增加 `PasswordResetChallenge` 和 `User.sessionVersion`，增量变更流程沿用登录计划；旧 JWT 没有版本时需重新登录。
 
@@ -94,14 +94,23 @@
 
 ### F11：验证邮件验证码、更新密码和撤销旧会话
 
-**Files:** 新增 `src/app/api/auth/password-reset/confirm/route.ts`、`src/server/features/auth/session-version.service.ts`、`tests/password-reset-confirm.test.ts`、`tests/session-version.test.ts`、`tests/integration/password-reset-consume.spec.ts`；修改恢复服务、`prisma/schema.prisma`、`auth.ts`、`src/server/auth/access.ts`、`src/shared/types/index.ts`、F04 登录测试。
+**Files:** 新增 `src/server/features/auth/password-reset-confirm.service.ts`、`src/server/features/auth/password-reset-input.ts`、`src/types/auth.d.ts`、`prisma/patches/20261027_session_version.sql`、`src/app/api/auth/password-reset/confirm/route.ts`、`src/server/features/auth/session-version.service.ts`、`tests/password-reset-confirm.test.ts`、`tests/session-version.test.ts`、`tests/integration/password-reset-consume.spec.ts`；修改恢复服务、`prisma/schema.prisma`、`auth.ts`、`src/server/auth/access.ts`、`src/shared/types/index.ts`、注册服务和已有权限测试的会话夹具。
 
 **Interfaces:** `confirmPasswordReset(input: {email: string; code: string; newPassword: string; ip: string}): Promise<void>`；POST `/api/auth/password-reset/confirm`；`isSessionCurrent(userId: string, sessionVersion: number): Promise<boolean>`。User 增加 `sessionVersion Int @default(0)`，认证成功读取的版本随 user 固定写入 JWT；session 和 getActor 校验最新版本，缺失／失配都拒绝。
 
-- [ ] 失败测试覆盖正确码重置、过期／旧码／重复码拒绝、5 次错误后失效、重发不重置整体校验额度、并发只有一次成功；新密码 UTF-8 超过 bcrypt 72 字节拒绝。
-- [ ] 运行 `pnpm test --runInBand tests/password-reset-confirm.test.ts tests/session-version.test.ts`，确认预期失败。
-- [ ] 事务锁定活动挑战和用户，完成验证码常量时间比较、密码哈希更新、挑战消费及 sessionVersion 加一；错误计数更新以业务结果返回后再转换错误，确保提交计数。密码校验时读出的版本与密码快照绑定，JWT 回调不得用后来读到的版本给旧密码登录升级会话。
-- [ ] 单元与真实库并发测试通过；验证旧 JWT 访问会话接口和管理 API 都无效，新密码可登录，旧密码失败。重置事务失败不消费验证码、不改密码／版本。
+- [x] 失败测试覆盖正确码重置、过期／旧码／重复码拒绝、5 次错误后失效、重发不重置整体校验额度、并发只有一次成功；新密码 UTF-8 超过 bcrypt 72 字节拒绝。
+- [x] 运行 `pnpm test --runInBand tests/password-reset-confirm.test.ts tests/session-version.test.ts`，确认预期失败。
+- [x] 事务锁定活动挑战和用户，完成验证码常量时间比较、密码哈希更新、挑战消费及 sessionVersion 加一；错误计数更新以业务结果返回后再转换错误，确保提交计数。密码校验时读出的版本与密码快照绑定，JWT 回调不得用后来读到的版本给旧密码登录升级会话。
+- [x] 单元与真实库并发测试通过；验证旧 JWT 访问会话接口和管理 API 都无效，新密码可登录，旧密码失败。重置事务失败不消费验证码、不改密码／版本。
+
+**F11 执行记录（2026-10-27，基线 327e86b）：**
+
+- F10 已提交到 dev；F11 使用隔离分支 `codex/password-reset-confirm` 和专用测试库开发。完整过程与最终证据见 [F11 执行记录](./2026-10-27-phase11-execution.md)。
+- 消费接口先校验邮箱、六位码、新密码和来源 IP，再按 IP／邮箱分别扣减校验额度。bcrypt 在行锁事务外计算；事务内锁定挑战及其绑定用户，只接受 SENT、未过期、未消费、未耗尽错误次数的 HMAC 摘要。
+- 错误验证码提交计数，第五次错误清除摘要；成功时同一事务更新密码、增加 sessionVersion、消费挑战并清除登录失败锁定。数据库失败整体回滚。
+- 登录／注册使用密码对应的版本快照；JWT 检查数据库中的当前版本，getActor 读取权限时再次校验。旧令牌不能通过客户端更新升级，缺失版本、已删除用户和数据库故障均不获得授权。
+- 验证：346 项 Jest、86 项完整认证 Playwright／隔离 MySQL 回归通过；覆盖旧会话访问会话接口与管理 API 失效、新密码登录、并发一次消费、错误尝试持久化及数据库故障回滚。TypeScript、lint 与生产构建通过，lint 保留 10 项既有 Hook 警告。
+- 启用顺序：先确认 F10 挑战表已建（`20261026_password_reset.sql`），再对目标库执行 `prisma/patches/20261027_session_version.sql`，生成 Prisma 客户端，最后切换代码／重启应用。旧 JWT 没有版本，升级后需要重新登录。本轮只迁移专用测试库，未合并到 dev、未迁移应用库、未验证外部服务商收信。
 
 ### F12：忘记密码页面与完整找回体验
 

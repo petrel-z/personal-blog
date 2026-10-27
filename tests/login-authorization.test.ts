@@ -16,16 +16,16 @@ const authorize = (NextAuth as jest.Mock).mock.calls[0][0].providers[0].authoriz
 
 test('deleted users cannot obtain a new session even with the correct password', async () => {
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-    id: 'deleted', email: 'deleted@example.com', password: '$2a$10$' + 'a'.repeat(53), deletedAt: new Date(),
+    id: 'deleted', sessionVersion: 0, email: 'deleted@example.com', password: '$2a$10$' + 'a'.repeat(53), deletedAt: new Date(),
   })
   expect(await authorize({ email: 'deleted@example.com', password: 'correct' })).toBeNull()
 })
 
 test('active users retain normal password login', async () => {
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-    id: 'active', email: 'active@example.com', name: 'Active', password: '$2a$10$' + 'a'.repeat(53), deletedAt: null,
+    id: 'active', sessionVersion: 0, email: 'active@example.com', name: 'Active', password: '$2a$10$' + 'a'.repeat(53), deletedAt: null,
   })
-  expect(await authorize({ email: 'active@example.com', password: 'correct' })).toMatchObject({ id: 'active' })
+  expect(await authorize({ email: 'active@example.com', password: 'correct' })).toMatchObject({ id: 'active', sessionVersion: 0 })
 })
 
 

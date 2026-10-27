@@ -46,11 +46,11 @@ afterEach(() => jest.restoreAllMocks())
 
 describe.each([
   ['visitor', null, 401, 4010],
-  ['member', { user: { id: 'member' } }, 403, 4030],
+  ['member', { user: { id: 'member', sessionVersion: 0 } }, 403, 4030],
 ] as const)('%s management access', (_name, session, status, code) => {
   test.each(routes)('%s %s denies before parsing the body or performing effects', async (route, method) => {
     ;(auth as jest.Mock).mockResolvedValue(session)
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'member', deletedAt: null, userRoles: [] })
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'member', sessionVersion: 0, deletedAt: null, userRoles: [] })
     const handler = require(`../src/app/api/${route}`)[method]
     const response = await handler(new Request('http://localhost/api/test', {
       method,
@@ -71,9 +71,9 @@ describe.each([
 })
 
 test('a settings administrator can update settings', async () => {
-  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'admin' } })
+  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'admin', sessionVersion: 0 } })
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-    id: 'admin', deletedAt: null,
+    id: 'admin', sessionVersion: 0, deletedAt: null,
     userRoles: [{ role: { name: 'admin', rolePermissions: [] } }],
   })
   ;(prisma.settings.upsert as jest.Mock).mockResolvedValue({ key: 'blogName', value: 'Updated' })
@@ -98,9 +98,9 @@ test.each(['categories', 'tags'])('public %s list remains available without a se
 })
 
 test('approval-only reviewers cannot reject a comment', async () => {
-  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'reviewer' } })
+  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'reviewer', sessionVersion: 0 } })
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-    id: 'reviewer', deletedAt: null, userRoles: [{ role: {
+    id: 'reviewer', sessionVersion: 0, deletedAt: null, userRoles: [{ role: {
       name: 'reviewer', rolePermissions: [{ permission: { code: 'comment:approve' } }],
     } }],
   })
@@ -113,9 +113,9 @@ test('approval-only reviewers cannot reject a comment', async () => {
 })
 
 test('an authorized review records the authenticated actor', async () => {
-  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'reviewer' } })
+  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'reviewer', sessionVersion: 0 } })
   ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-    id: 'reviewer', deletedAt: null, userRoles: [{ role: {
+    id: 'reviewer', sessionVersion: 0, deletedAt: null, userRoles: [{ role: {
       name: 'reviewer', rolePermissions: [{ permission: { code: 'comment:approve' } }],
     } }],
   })
