@@ -1,6 +1,6 @@
 # 邮箱验证码找回密码 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已提交为 `327e86b`；2026-10-27 在 `codex/password-reset-confirm` 完成 F11 隔离验收。应用库及真实邮件环境待配置；侧聊禁止子代理，由作者顺序实施与自审，F12 留待下一小功能。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已提交为 `327e86b`；2026-10-27 完成 F11 隔离验收并按用户指示快进合入 `dev`（`d4d8d54`），本地数据库结构已同步。后续直接在 `dev` 逐项开发，不创建功能分支／工作树。真实邮件环境待配置；侧聊禁止子代理，由作者顺序实施与自审，F12 留待下一小功能。
 
 **Goal:** 用户通过注册邮箱接收 6 位验证码，设置新密码并撤销旧会话。
 
@@ -110,7 +110,7 @@
 - 错误验证码提交计数，第五次错误清除摘要；成功时同一事务更新密码、增加 sessionVersion、消费挑战并清除登录失败锁定。数据库失败整体回滚。
 - 登录／注册使用密码对应的版本快照；JWT 检查数据库中的当前版本，getActor 读取权限时再次校验。旧令牌不能通过客户端更新升级，缺失版本、已删除用户和数据库故障均不获得授权。
 - 验证：346 项 Jest、86 项完整认证 Playwright／隔离 MySQL 回归通过；覆盖旧会话访问会话接口与管理 API 失效、新密码登录、并发一次消费、错误尝试持久化及数据库故障回滚。TypeScript、lint 与生产构建通过，lint 保留 10 项既有 Hook 警告。
-- 启用顺序：先确认 F10 挑战表已建（`20261026_password_reset.sql`），再对目标库执行 `prisma/patches/20261027_session_version.sql`，生成 Prisma 客户端，最后切换代码／重启应用。旧 JWT 没有版本，升级后需要重新登录。本轮只迁移专用测试库，未合并到 dev、未迁移应用库、未验证外部服务商收信。
+- 启用顺序：先确认 F10 挑战表已建（`20261026_password_reset.sql`），再对目标库执行 `prisma/patches/20261027_session_version.sql`，生成 Prisma 客户端，最后切换代码／重启应用。旧 JWT 没有版本，升级后需要重新登录。首次验收只迁移专用测试库；之后用户明确要求直接在 dev 开发，已合入 dev 并将这两项增量结构应用到本地 blog 库。外部服务商收信尚未验证。
 
 ### F12：忘记密码页面与完整找回体验
 
