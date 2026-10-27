@@ -34,6 +34,27 @@ model AuthRateBucket {
   @@index([windowStart])
 }
 
+enum ResetDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// One current challenge per normalized email; unknown addresses use the same cooldown.
+model PasswordResetChallenge {
+  emailKey       String              @id @db.Char(64)
+  challengeId    String              @db.Char(36)
+  userId         String?
+  codeHash       String?             @db.Char(64)
+  expiresAt      DateTime
+  sentAt         DateTime
+  failedAttempts Int                 @default(0)
+  consumedAt     DateTime?
+  deliveryStatus ResetDeliveryStatus @default(PENDING)
+
+  @@index([expiresAt])
+}
+
 // ============================================
 // RBAC Permission Model
 // ============================================

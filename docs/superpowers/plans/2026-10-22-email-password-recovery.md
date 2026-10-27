@@ -1,6 +1,6 @@
 # 邮箱验证码找回密码 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已完成本地验收、尚未提交，真实 SMTP 待配置。侧聊禁止子代理，由作者顺序实施与自审；F10–F12 留待后续小功能。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已完成隔离验收、尚未提交；应用库及真实邮件环境待配置。侧聊禁止子代理，由作者顺序实施与自审；F11–F12 留待后续小功能。
 
 **Goal:** 用户通过注册邮箱接收 6 位验证码，设置新密码并撤销旧会话。
 
@@ -63,14 +63,34 @@
 
 ### F10：申请并发送密码找回验证码
 
-**Files:** 新增 `src/server/features/auth/password-reset.service.ts`、`src/app/api/auth/password-reset/request/route.ts`、`tests/password-reset-request.test.ts`、`tests/integration/password-reset-issue.spec.ts`；修改 `prisma/schema.prisma`、`.env.example`。
+**Files:** 新增 `src/server/features/auth/password-reset{.service,-code,-error}.ts`、`src/app/api/auth/password-reset/request/route.ts`、`tests/password-reset-request.test.ts`、`tests/integration/password-reset-issue.spec.ts` 和增量建表脚本 `prisma/patches/20261026_password_reset.sql`；修改 `prisma/schema.prisma`、`.env.example`、邮件传输接口与对应测试、`playwright.auth.config.ts`。
 
-**Interfaces:** `requestPasswordReset(input: {email: string; captchaId: string; captchaCode: string; ip: string}, deps: {mail: MailTransport}): Promise<{message: string; retryAfterSeconds: number}>`；POST `/api/auth/password-reset/request` 不接受客户端 ip，以服务端请求上下文解析。固定成功提示“如果该邮箱已注册，你将收到验证码”。验证码记录保存 emailKey、challengeId、codeHash、expiresAt、failedAttempts、sentAt、consumedAt、deliveryStatus；每 emailKey 只有一个活动记录。验证码签名使用新增专用 `AUTH_CODE_SECRET`，不与邮件凭据混用。
+**Interfaces:** `requestPasswordReset(input: {email: string; captchaId: string; captchaCode: string; ip: string}, deps?: {mail?: MailTransport}): Promise<{message: string; retryAfterSeconds: number}>`；POST `/api/auth/password-reset/request` 不接受客户端 ip，以服务端请求上下文解析。固定成功提示“如果该邮箱已注册，你将收到验证码”。验证码记录保存 emailKey、userId、challengeId、codeHash、expiresAt、failedAttempts、sentAt、consumedAt、deliveryStatus；每 emailKey 只有一个活动记录。验证码签名使用新增专用 `AUTH_CODE_SECRET`，不与邮件凭据混用。
 
-- [ ] 失败测试：验证码严格为 6 位数字（允许前导零）；10 分钟过期；60 秒内重发拒绝；发送额度耗尽 429；未知／已删除邮箱响应一致；没有图片验证码不查询用户或发送邮件。
-- [ ] 运行 `pnpm test --runInBand tests/password-reset-request.test.ts`，确认预期失败。
-- [ ] 复用 F03 `consumeCaptcha` 的 password-reset 用途、F04 `emailKey` 与 `consumeQuota`。申请先对存在／不存在邮箱一致地预留额度及重发时间，MySQL 行锁保护单活动挑战；SMTP 调用不占长事务。验证码发送结果只更新匹配 challengeId 的记录，失败记录不可用于重置。整体邮件服务不可用统一报系统错误；按收件人发生的投递失败只记脱敏运维结果，不能通过申请响应暴露账号。
-- [ ] 单元与实际库并发测试通过，验证重新发送后上一验证码不可用；API 不返回验证码，测试邮件只通过注入的捕获传输取得。
+- [x] 失败测试：验证码严格为 6 位数字（允许前导零）；10 分钟过期；60 秒内重发拒绝；发送额度耗尽 429；未知／已删除邮箱响应一致；没有图片验证码不查询用户或发送邮件。
+- [x] 运行 `pnpm test --runInBand tests/password-reset-request.test.ts`，确认预期失败。
+- [x] 复用 F03 `consumeCaptcha` 的 password-reset 用途、F04 `emailKey` 与 `consumeQuota`。申请先对存在／不存在邮箱一致地预留额度及重发时间，MySQL 行锁保护单活动挑战；SMTP 调用不占长事务。验证码发送结果只更新匹配 challengeId 的记录，失败记录不可用于重置。整体邮件服务不可用统一报系统错误；按收件人发生的投递失败只记脱敏运维结果，不能通过申请响应暴露账号。
+- [x] 单元与实际库并发测试通过，验证重新发送后上一验证码不可用；API 不返回验证码，测试邮件只通过注入的捕获传输取得。
+
+**F10 执行记录（2026-10-26，基线 96ec392）：**
+
+- 用户要求“提交并继续”；F09 提交前重新通过 307 项 Jest、TypeScript 和差异检查，中文提交“feat(auth): 增加安全邮件传输与密码重置验证码模板”（96ec392）。提交核对补齐被 *.pem 忽略的两份公开测试夹具，并仅为这两条路径增加例外。
+- Ruling：沿用当前 dev 工作区，隔离副本运行浏览器和构建，计划执行记录继续作为账本；本侧聊不使用子代理，完成 F10 后逐项交付，F11/F12 留待后续。
+- Pre-flight：复用 F03 的 password-reset 图片验证码和 F04 的 emailKey/consumeQuota；F09 的纯发送接口需补充 verify()，在查询账号前统一检查连接与认证。捕获传输实现无网络检查，真实适配器使用 SMTP verify，不发送测试邮件。
+- Ruling：配置或统一可用性检查失败对全部邮箱返回 503；预检查通过后出现的单次投递失败均记录脱敏结果、清除该挑战摘要并维持统一申请响应。这避免连接在预检查后中断时泄露账号存在性；代价是这种故障不会在申请页面直接报发送失败，用户可冷却后重试。
+- Pre-flight：新增按 emailKey 唯一的挑战，绑定 userId/challengeId/HMAC 摘要及投递状态；F11 仅能消费 SENT、未过期、未消费且属于当前用户的记录。SMTP 调用在事务外，完成结果按 challengeId 条件更新，旧发送不能覆盖新挑战。
+- Ruling：数据库采用独立增量建表 SQL，先在隔离测试库验证；本轮不改应用库。AUTH_CODE_SECRET 只在示例中列出，不生成或修改实际环境密钥。
+
+- 实现链路：请求路由只从服务端请求上下文读取 IP，覆盖 body.ip；格式和图片验证码先校验，随后读取专用密钥，并按 IP／邮箱分别消耗每小时 20／5 次申请额度。冷却期间的有效申请也占额度；额度失败返回 429、Retry-After 和 retryAfterSeconds，图片验证码已消费需刷新。
+- 并发与凭据：crypto.randomInt 生成六位数字，允许前导零；AUTH_CODE_SECRET 至少 32 字节且不可复用 AUTH_SECRET/NEXTAUTH_SECRET。HMAC 绑定 password-reset 用途、邮箱键、challengeId 和验证码。INSERT ON DUPLICATE KEY UPDATE 与 FOR UPDATE 保护同一邮箱，包括未知邮箱；短事务内校验 60 秒冷却并替换活动挑战，写入 10 分钟过期时间。记录绑定原账号 userId，防止未来邮箱被其他账号占用后复用挑战。
+- 发送与失败：配置／连接检查在查询用户前执行；投递在事务外完成。只给未删除账号发送，未知／已删除账号记录同样冷却但不保留可用摘要。成功记录 SENT；失败清除摘要并记 FAILED，固定日志不包含邮件内容或原始 SMTP 错误。完成写入同时匹配邮箱键、challengeId 和 PENDING，已过时的发送结果不能修改新挑战。
+- API：POST /api/auth/password-reset/request；成功只返回统一提示和 60 秒重试信息，禁止缓存，不返回账号、验证码或挑战 ID。缺少 SMTP 或专用签名密钥时不开放实际找回；预检查后的投递故障按上述 Ruling 保持相同响应。来源 IP 沿用项目 getClientIp，部署时需要可信反向代理覆盖 X-Forwarded-For；不接受 JSON 中的客户端 IP。
+- RED/GREEN：先观察恢复模块缺失和 verify 缺失失败，随后完成实现。新增 12 项 Jest（含 F09 verify 扩展及 IPv6 回归）和 15 项实际数据库／路由集成测试；覆盖四请求并发只发一封、每邮箱五次上限、IP 最后一份额度并发争用、重发替换旧摘要、投递失败清除摘要、旧发送晚成功／晚失败、未知与删除邮箱、错误用途与重复图片验证码、HTTP 400/429/503，以及真实 TLS 连接的路由成功发送且响应不含身份或验证码。
+- 作者自审：按 code-reviewer 模板检查计划对齐、事务、错误、输入与测试范围；未使用独立审阅者。发现 Node isIP 接受带网卡标识的 IPv6，但 URL 解析会抛错；补充回归先复现 ERR_INVALID_URL，再将这类无效来源归入 unknown 限流键。最后将 HTTP 配置失败测试改为独立来源 IP，避免反复运行累积公共测试 IP 的额度。
+- 验证：最终全量 Jest 21 套／319 项通过，完整认证 Playwright／隔离 MySQL 72 项通过，TypeScript、lint 和生产构建通过（lint 保留 10 项既有 Hook 警告）。增量 SQL 经 schema diff 核对只新增一张挑战表；隔离库应用后 schema diff 为空。测试账号、挑战及 reset:send 限流记录已清理。
+- 最终 IPv6 修复与测试 IP 隔离后，重新运行三项路由边界／真实 TLS 投递测试，全部通过；最终实现文件与验证副本逐一比对一致。
+- 验收边界：仅在隔离测试库应用增量 SQL，应用库只做只读 schema diff；启用时需应用建表脚本并配置 AUTH_CODE_SECRET 与 SMTP。真实服务商收信尚未验证；验证码消费、新密码更新、旧会话撤销和页面入口仍属 F11/F12。统一状态／文案与额度不等于恒定响应时延；严格抹平 SMTP 投递的时序差异需另行设计异步投递流程。
+- 证据目录：`/var/folders/wq/czh3jxv940nf6d5nqsf7yy100000gn/T/blog-f10-tetgmovd/`。F10 工作区变更待审阅，无新的业务依赖。
 
 ### F11：验证邮件验证码、更新密码和撤销旧会话
 

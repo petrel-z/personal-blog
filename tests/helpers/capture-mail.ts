@@ -5,6 +5,7 @@ export function createCaptureMailTransport(): MailTransport & { messages: MailMe
   const messages: MailMessage[] = []
   return {
     messages,
+    async verify() {},
     async send(message) { messages.push({ ...message }) },
   }
 }

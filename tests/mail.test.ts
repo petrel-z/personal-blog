@@ -14,10 +14,20 @@ const env = {
 }
 const message = () => ({ to: 'recipient@example.com', ...buildResetCodeMail('001234') })
 const sendMail = jest.fn()
+const verify = jest.fn()
 beforeEach(() => {
   jest.resetAllMocks()
-  ;(nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail })
+  ;(nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail, verify })
   sendMail.mockResolvedValue({ accepted: ['recipient@example.com'], rejected: [] })
+})
+
+test('mail availability checks authenticate without sending a message and sanitize failures', async () => {
+  verify.mockResolvedValue(true)
+  await createMailTransport(env).verify()
+  expect(verify).toHaveBeenCalledTimes(1)
+  expect(sendMail).not.toHaveBeenCalled()
+  verify.mockRejectedValue(new Error(`${env.SMTP_PASSWORD} rejected`))
+  await expect(createMailTransport(env).verify()).rejects.toMatchObject({ code: 'MAIL_UNAVAILABLE', message: '邮件服务暂时不可用' })
 })
 
 test('reset_mail_contains_code_and_expiry', async () => {

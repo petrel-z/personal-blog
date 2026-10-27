@@ -38,6 +38,9 @@ export function createMailTransport(env: Record<string, string | undefined> = pr
   const config = readMailConfig(env)
   const smtp = createSmtpClient(config)
   return {
+    async verify() {
+      try { await smtp.verify() } catch { throw new MailError('MAIL_UNAVAILABLE') }
+    },
     async send(message) {
       const parsed = messageSchema.safeParse(message)
       if (!parsed.success) throw new MailError('MAIL_MESSAGE_INVALID')

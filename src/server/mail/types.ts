@@ -9,6 +9,8 @@ export interface MailMessage extends MailContent {
 }
 
 export interface MailTransport {
+  /** Checks connection/authentication without looking up a recipient or sending mail. */
+  verify(): Promise<void>
   /** Resolves after the SMTP server accepts the message; inbox delivery is not guaranteed. */
   send(message: MailMessage): Promise<void>
 }

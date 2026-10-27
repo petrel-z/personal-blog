@@ -21,6 +21,7 @@ process.env.AUTH_TEST_DATABASE_URL = testUrl
 process.env.DATABASE_URL = testUrl
 process.env.AUTH_SECRET = testEnv.AUTH_SECRET
 process.env.AUTH_URL = 'http://127.0.0.1:3017'
+process.env.AUTH_CODE_SECRET = testEnv.AUTH_CODE_SECRET || 'isolated-password-reset-secret-32-bytes-minimum'
 
 export default defineConfig({
   testDir: './tests',
@@ -33,6 +34,10 @@ export default defineConfig({
     url: 'http://127.0.0.1:3017/login',
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { DATABASE_URL: testUrl, AUTH_URL: 'http://127.0.0.1:3017', AUTH_SECRET: process.env.AUTH_SECRET! },
+    env: { DATABASE_URL: testUrl, AUTH_URL: 'http://127.0.0.1:3017', AUTH_SECRET: process.env.AUTH_SECRET!,
+      AUTH_CODE_SECRET: process.env.AUTH_CODE_SECRET!,
+      // These tests inject capture transports; never inherit a real SMTP destination.
+      SMTP_HOST: '', SMTP_PORT: '', SMTP_SECURE: '', SMTP_USER: '', SMTP_PASSWORD: '', MAIL_FROM: '',
+    },
   },
 })
