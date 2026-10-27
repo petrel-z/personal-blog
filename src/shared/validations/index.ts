@@ -73,3 +73,18 @@ export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(50).default(10),
 })
+
+
+export const resetRequestFormSchema = z.object({
+  email: accountSchema.shape.email,
+  captcha: z.string().regex(/^[a-z0-9]{4}$/i, '请输入 4 位图片验证码'),
+})
+
+export const resetPasswordFormSchema = z.object({
+  email: accountSchema.shape.email,
+  code: z.string().regex(/^\d{6}$/, '请输入 6 位数字邮件验证码'),
+  newPassword: accountSchema.shape.password,
+  confirmPassword: z.string().min(1, '请确认新密码'),
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: '两次密码不一致', path: ['confirmPassword'],
+})

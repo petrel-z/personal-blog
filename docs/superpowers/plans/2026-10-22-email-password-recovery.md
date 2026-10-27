@@ -1,6 +1,6 @@
 # 邮箱验证码找回密码 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已提交为 `327e86b`；2026-10-27 完成 F11 隔离验收并按用户指示快进合入 `dev`（`d4d8d54`），本地数据库结构已同步。后续直接在 `dev` 逐项开发，不创建功能分支／工作树。真实邮件环境待配置；侧聊禁止子代理，由作者顺序实施与自审，F12 留待下一小功能。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 2026-10-26 用户要求“提交代码，继续开发”；F08 已提交为 `e763246`，F09 已提交为 `96ec392`，F10 已提交为 `327e86b`；2026-10-27 完成 F11 隔离验收并按用户指示快进合入 `dev`（`d4d8d54`），本地数据库结构已同步。后续直接在 `dev` 逐项开发，不创建功能分支／工作树。真实邮件环境待配置；侧聊禁止子代理，由作者顺序实施与自审，F12 页面与隔离浏览器流程已完成，真实邮件环境仍待配置。
 
 **Goal:** 用户通过注册邮箱接收 6 位验证码，设置新密码并撤销旧会话。
 
@@ -114,15 +114,23 @@
 
 ### F12：忘记密码页面与完整找回体验
 
-**Files:** 新增 `src/app/forgot-password/page.tsx`、`src/app/forgot-password/_components/PasswordResetForm.tsx`、`tests/e2e/password-recovery.spec.ts`；复用／扩展 F09 的 `tests/helpers/capture-smtp.ts`；修改 `src/app/login/page.tsx`、`src/shared/validations/index.ts`、`playwright.auth.config.ts`、`tests/integration/auth-fixtures.ts`，更新本计划的环境说明。
+**Files:** 新增 `src/app/forgot-password/page.tsx`、`src/app/forgot-password/_components/PasswordResetForm.tsx`、`tests/e2e/password-recovery.spec.ts`；新增 `tests/helpers/recovery-app.ts`、`playwright.recovery.config.ts`，复用 F09 的 `tests/helpers/capture-smtp.ts`；修改 `src/app/login/page.tsx`、`src/shared/validations/index.ts`，更新本计划的环境说明。
 
 **Interfaces:** 复用 F02 `useCaptcha('password-reset')` 与 F10/F11 路由。第一步邮箱＋图片验证码，第二步邮件验证码＋新密码＋确认密码；重发申请使用新图片验证码。倒计时读取服务端 retryAfterSeconds；浏览器可保存不含邮箱/验证码/密码的冷却截止时间以恢复展示，服务端始终最终判定。
 
-- [ ] 浏览器失败回归：完整找回、输入错误码、过期码、确认密码不一致、重发倒计时、刷新后重发仍受限、网络失败可重试；成功返回登录页后使用新密码登录。
-- [ ] 运行 `pnpm exec playwright test --config=playwright.auth.config.ts tests/e2e/password-recovery.spec.ts`，确认当前没有入口和流程。测试启动本地 SMTP 捕获器，再把其连接配置传给专用应用进程；测试从捕获器读取邮件，页面和业务 API 不提供读取验证码的后门。
-- [ ] 实现两步表单、“重新发送”“返回登录”和成功反馈；邮箱只在当前组件内保留，验证码／密码仅内存保存；失败按 F02 刷新已消费的图片验证码，按钮状态防重复提交。
-- [ ] 浏览器流程及 `pnpm typecheck` 通过，复核日志与存储不含敏感输入。真实 SMTP 未配置时标记验收限制，不将仅接口成功当作真实收信成功。
+- [x] 浏览器失败回归：完整找回、输入错误码、过期码、确认密码不一致、重发倒计时、刷新后重发仍受限、网络失败可重试；成功返回登录页后使用新密码登录。
+- [x] 运行 `pnpm exec playwright test --config=playwright.recovery.config.ts tests/e2e/password-recovery.spec.ts`，确认当前没有入口和流程。测试启动本地 SMTP 捕获器，再把其连接配置传给专用应用进程；测试从捕获器读取邮件，页面和业务 API 不提供读取验证码的后门。
+- [x] 实现两步表单、“重新发送”“返回登录”和成功反馈；邮箱只在当前组件内保留，验证码／密码仅内存保存；失败按 F02 刷新已消费的图片验证码，按钮状态防重复提交。
+- [x] 浏览器流程及 `pnpm typecheck` 通过，复核日志与存储不含敏感输入。真实 SMTP 未配置时标记验收限制，不将仅接口成功当作真实收信成功。
+
+**F12 执行记录（2026-10-27，dev 基线 503ace5）：**
+
+- 登录按钮下方新增“忘记密码？”入口，目标 /forgot-password。两步表单接入 F10 申请和 F11 确认接口，支持重新发送、已有验证码继续、更换邮箱、成功后返回登录。
+- 发送和确认各自显示服务端限流倒计时；仅将截止时间保存在浏览器本地存储，刷新不保存邮箱／验证码／密码，存储不可用仍可完成恢复。同步请求锁防止快速重复提交，失败时刷新图片验证码并允许重试。
+- 9 项浏览器测试全部先观察失败后通过；使用实际本机 TLS SMTP 捕获邮件、真实隔离 MySQL 与独立应用验证管理员完整找回和登录。未知邮件服务配置不伪造成功。测试框架 MIME 解码与路由播报器选择器问题已修正。
+- 346 项 Jest、原有 86 项认证回归、TypeScript 和 lint 通过；移动端截图已检查。生产构建因既有 Inter 字体下载超时失败，待网络恢复后重跑；完整过程和证据见 [F12 执行记录](./2026-10-27-phase12-execution.md)。
+- 当前本地 3000 服务已呈现入口和页面。真实 SMTP、AUTH_CODE_SECRET 尚未配置，用户真实邮箱的投递仍需另外验收。
 
 ## 阶段验收
 
-端到端写入使用隔离测试库和专用测试服务，不复用用户 3000 端口现有进程；测试 SMTP 捕获器和页面只能在测试环境使用。运行相关 Jest、Playwright 后，再运行 `pnpm test --runInBand`、`pnpm typecheck`、`pnpm lint`、`pnpm build`。记录邮件测试传输／实际投递、旧会话失效、并发消费三类证据及未完成配置。
+端到端写入使用隔离测试库和专用测试服务，不复用用户 3000 端口现有进程；测试 SMTP 捕获器和页面只能在测试环境使用。邮件找回浏览器测试使用 `playwright.recovery.config.ts`，其余认证回归使用 `playwright.auth.config.ts`。运行相关 Jest、Playwright 后，再运行 `pnpm test --runInBand`、`pnpm typecheck`、`pnpm lint`、`pnpm build`。记录邮件测试传输／实际投递、旧会话失效、并发消费三类证据及未完成配置。

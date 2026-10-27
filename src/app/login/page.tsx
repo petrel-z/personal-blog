@@ -43,6 +43,10 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
 
+        <p className="text-right text-sm">
+          <Link href="/forgot-password" className="text-primary hover:underline">忘记密码？</Link>
+        </p>
+
         <p className="text-xs text-center text-muted-foreground">
           登录即表示您同意我们的服务条款
         </p>
