@@ -35,6 +35,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status') as 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'all' | null
     const categoryId = searchParams.get('categoryId') || undefined
     const tagSlug = searchParams.get('tagSlug') || undefined
+    const search = searchParams.get('search')?.trim().slice(0, 200) || undefined
     const admin = searchParams.get('scope') === 'admin' || (!!status && status !== 'PUBLISHED')
     const actor = admin ? await requirePermission('post:read') : undefined
 
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
       status: status === 'all' ? undefined : status || undefined,
       categoryId,
       tagSlug,
+      search,
     }, actor)
 
     return NextResponse.json(

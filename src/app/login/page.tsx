@@ -1,63 +1,23 @@
 'use client'
 
-import React, { Suspense } from 'react'
+import { Suspense } from 'react'
 import Link from 'next/link'
-import { LoginForm } from '../(admin)/_components'
 import { Loader2 } from 'lucide-react'
+import { LoginForm } from '../(admin)/_components'
+import { AuthLayout } from '@/components/admin/AuthLayout'
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md p-8 space-y-6 border rounded-lg bg-card shadow-sm">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-primary"
-              >
-                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold">管理后台登录</h1>
-          <p className="text-sm text-muted-foreground">
-            请输入管理员账号信息
-          </p>
-        </div>
-
-        <Suspense fallback={
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="animate-spin text-muted-foreground" />
-          </div>
-        }>
-          <LoginForm />
-        </Suspense>
-
-        <p className="text-right text-sm">
-          <Link href="/forgot-password" className="text-primary hover:underline">忘记密码？</Link>
-        </p>
-
-        <p className="text-xs text-center text-muted-foreground">
-          登录即表示您同意我们的服务条款
-        </p>
-
-        <p className="text-xs text-center text-muted-foreground">
-          还没有账号？{' '}
-          <Link href="/register" className="text-primary hover:underline">
-            立即注册
-          </Link>
-        </p>
+    <AuthLayout>
+      <div className="auth-heading">
+        <h1>欢迎回来</h1>
+        <p>登录你的内容管理空间</p>
       </div>
-    </div>
+      <Suspense fallback={<div role="status" className="flex items-center gap-2 py-8"><Loader2 className="animate-spin" size={18} />正在加载登录表单…</div>}>
+        <LoginForm />
+      </Suspense>
+      <p className="auth-switch">还没有账号？<Link href="/register">创建账号</Link></p>
+      <p className="auth-permissions">普通会员无后台权限，请联系博主授权。</p>
+    </AuthLayout>
   )
 }

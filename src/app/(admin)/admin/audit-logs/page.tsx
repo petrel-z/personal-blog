@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { AdminPageHeader, AdminPanel, AdminState, AdminPagination } from '@/components/admin/ui'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
 
@@ -26,26 +27,26 @@ export default function AuditLogsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
-    fetchLogs()
-  }, [isAuthenticated, authLoading, page])
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       setIsLoading(true)
+      setError(null)
       const result = await api.get('/audit-logs', { page, pageSize: 20 }) as { code: number; data: { items: AuditLog[]; total: number; totalPages: number }; message: string }
       if (result.code === 2000 && result.data) {
         setLogs(result.data.items || [])
         setTotalPages(result.data.totalPages || 1)
-      }
+      } else { setError(result.message || '获取审计日志失败') }
     } catch {
       setError('获取审计日志失败')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page])
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return
+    void fetchLogs()
+  }, [isAuthenticated, authLoading, fetchLogs])
 
   const getActionColor = (action: string) => {
     if (action.includes('CREATE') || action.includes('POST')) return 'text-green-600 bg-green-50'
@@ -79,34 +80,14 @@ export default function AuditLogsPage() {
     return actionMap[action] || action
   }
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">审计日志</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          记录所有后台操作历史
-        </p>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
-
+      <AdminPageHeader title="审计日志" description="追溯后台操作记录，所有日志仅供查看。" />
+      <AdminPanel title="操作记录" description="按发生时间查看用户、操作与来源。">
+      {authLoading || isLoading ? <AdminState kind="loading" title="正在加载审计日志…" /> : error ? <AdminState kind="error" title="日志加载失败" description={error} onRetry={() => void fetchLogs()} /> : logs.length === 0 ? <AdminState title="暂无日志" description="后台操作发生后，将在这里留下记录。" /> : <>
       {/* Logs Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <table className="w-full">
+      <div className="admin-table-wrap">
+        <table className="admin-table admin-table-mobile">
           <thead className="bg-sidebar">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium">时间</th>
@@ -126,24 +107,24 @@ export default function AuditLogsPage() {
             ) : (
               logs.map((log) => (
                 <tr key={log.id} className="hover:bg-accent/50">
-                  <td className="px-4 py-3 text-muted-foreground text-sm">
+                  <td data-label="时间">
                     {new Date(log.createdAt).toLocaleString('zh-CN')}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="用户">
                     <div className="text-sm">
                       <p className="font-medium">{log.user?.name || '系统'}</p>
                       <p className="text-muted-foreground text-xs">{log.user?.email}</p>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="操作">
                     <span className={`px-2 py-1 text-xs rounded-full ${getActionColor(log.action)}`}>
                       {formatAction(log.action)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                  <td data-label="目标">
                     {log.target || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
+                  <td data-label="IP" className="font-mono">
                     {log.ipAddress || '-'}
                   </td>
                 </tr>
@@ -153,28 +134,9 @@ export default function AuditLogsPage() {
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-3 py-1.5 border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            上一页
-          </button>
-          <span className="px-3 py-1.5 text-sm text-muted-foreground">
-            第 {page} / {totalPages} 页
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="px-3 py-1.5 border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            下一页
-          </button>
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </>}
+      </AdminPanel>
     </div>
   )
 }

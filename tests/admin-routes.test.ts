@@ -14,6 +14,8 @@ import { prisma } from '@/server/db'
 import { writeFile } from 'fs/promises'
 
 const routes = [
+  ['stats/views/route', 'GET'],
+  ['stats/popular/route', 'GET'],
   ['posts/route', 'POST'],
   ['posts/[id]/route', 'PATCH'],
   ['posts/[id]/route', 'DELETE'],

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { AdminPageHeader, AdminPanel, AdminState } from '@/components/admin/ui'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
 
@@ -14,6 +15,10 @@ interface SiteSettings {
   autoApproveComments: boolean
   requireEmailForComments: boolean
 }
+
+const tabLabels = { basic: '基本信息', social: '社交链接', comments: '评论设置' }
+const basicFields = [['blogName', '博客名称', ''], ['blogDescription', '博客描述', '简短介绍博客关注的内容。'], ['blogKeywords', '关键词', '用于 SEO，多个关键词用逗号分隔。'], ['ogImage', 'OG 图片地址', '用于社交分享，建议尺寸 1200 × 630。']] as const
+const socialFields = [['githubUrl', 'GitHub', ''], ['twitterUrl', 'Twitter', '']] as const
 
 export default function SettingsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
@@ -31,21 +36,24 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [tab, setTab] = useState<keyof typeof tabLabels>('basic')
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
+    if (authLoading || !isAuthenticated) return
     fetchSettings()
   }, [isAuthenticated, authLoading])
 
   const fetchSettings = async () => {
     try {
       setIsLoading(true)
+      setLoadError(null)
       const result = await api.get('/settings') as { code: number; data: SiteSettings; message: string }
       if (result.code === 2000 && result.data) {
         setSettings(result.data)
-      }
+      } else { setLoadError(result.message || '获取设置失败') }
     } catch {
-      // Use default settings
+      setLoadError('获取设置失败，请重试')
     } finally {
       setIsLoading(false)
     }
@@ -61,9 +69,9 @@ export default function SettingsPage() {
       const result = await api.put('/settings', settings)
       if (result.code === 2000) {
         setSuccess(true)
-        setTimeout(() => setSuccess(false), 3000)
+
       } else {
-        setError('保存设置失败')
+        setError(result.message || '保存设置失败')
       }
     } catch {
       setError('保存设置失败')
@@ -72,178 +80,40 @@ export default function SettingsPage() {
     }
   }
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">系统设置</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          配置博客的基本信息和功能选项
-        </p>
-      </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
+  return <div className="space-y-6">
+    <AdminPageHeader title="系统设置" description="配置博客的基本信息、社交链接与评论规则。" />
+    {authLoading || isLoading ? <AdminState kind="loading" title="正在加载设置…" /> : loadError ?
+      <AdminState kind="error" title="设置加载失败" description={loadError} onRetry={() => void fetchSettings()} /> :
+      <AdminPanel>
+        <div className="admin-tabs" role="tablist" aria-label="设置分组">
+          {(['basic', 'social', 'comments'] as const).map(key => <button type="button" role="tab" id={`settings-tab-${key}`} aria-controls={`settings-panel-${key}`} key={key} aria-selected={tab === key} onClick={() => setTab(key)}>{tabLabels[key]}</button>)}
         </div>
-      )}
-      {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-600">
-          设置已保存
-        </div>
-      )}
-
-      {/* Settings Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Blog Info */}
-        <div className="border rounded-lg p-4 space-y-4">
-          <h2 className="font-medium flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-            </svg>
-            博客信息
-          </h2>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">博客名称</label>
-            <input
-              type="text"
-              value={settings.blogName}
-              onChange={(e) => setSettings({ ...settings, blogName: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">博客描述</label>
-            <textarea
-              value={settings.blogDescription}
-              onChange={(e) => setSettings({ ...settings, blogDescription: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg resize-none"
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">关键词</label>
-            <input
-              type="text"
-              value={settings.blogKeywords}
-              onChange={(e) => setSettings({ ...settings, blogKeywords: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="用逗号分隔"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              用于 SEO，多个关键词用逗号分隔
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">OG 图片地址</label>
-            <input
-              type="url"
-              value={settings.ogImage}
-              onChange={(e) => setSettings({ ...settings, ogImage: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="https://example.com/og-image.png"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              用于社交分享的图片，建议尺寸 1200x630
-            </p>
-          </div>
-        </div>
-
-        {/* Social Links */}
-        <div className="border rounded-lg p-4 space-y-4">
-          <h2 className="font-medium flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
-              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-            </svg>
-            社交链接
-          </h2>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">GitHub</label>
-            <input
-              type="url"
-              value={settings.githubUrl}
-              onChange={(e) => setSettings({ ...settings, githubUrl: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="https://github.com/username"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Twitter</label>
-            <input
-              type="url"
-              value={settings.twitterUrl}
-              onChange={(e) => setSettings({ ...settings, twitterUrl: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="https://twitter.com/username"
-            />
-          </div>
-        </div>
-
-        {/* Comment Settings */}
-        <div className="border rounded-lg p-4 space-y-4">
-          <h2 className="font-medium flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            评论设置
-          </h2>
-
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="autoApprove"
-              checked={settings.autoApproveComments}
-              onChange={(e) => setSettings({ ...settings, autoApproveComments: e.target.checked })}
-              className="rounded"
-            />
-            <label htmlFor="autoApprove" className="text-sm">
-              自动审核通过评论
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground -mt-2">
-            开启后，评论将直接显示，无需审核
-          </p>
-
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="requireEmail"
-              checked={settings.requireEmailForComments}
-              onChange={(e) => setSettings({ ...settings, requireEmailForComments: e.target.checked })}
-              className="rounded"
-            />
-            <label htmlFor="requireEmail" className="text-sm">
-              评论时必须填写邮箱
-            </label>
-          </div>
-        </div>
-
-        {/* Submit */}
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            {isSaving ? '保存中...' : '保存设置'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
+        <form onSubmit={handleSubmit} className="admin-form p-6 md:p-8">
+          {error && <p role="alert" className="admin-notice admin-notice-error">{error}，请重试。已保留本次填写内容。</p>}
+          {success && <p role="status" className="admin-notice">设置已保存</p>}
+          <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_300px]"><section role="tabpanel" id={`settings-panel-${tab}`} aria-labelledby={`settings-tab-${tab}`} className="max-w-2xl space-y-6">
+            <div><h2 className="text-base font-semibold">{tabLabels[tab]}</h2><p className="mt-2 text-sm text-muted-foreground">{tab === 'basic' ? '这些信息将用于网站展示、搜索引擎与社交分享。' : tab === 'social' ? '填写完整链接，留空则不展示对应入口。' : '设置访客评论的审核方式与信息要求。'}</p></div>
+            {tab !== 'comments' ? (tab === 'basic' ? basicFields : socialFields).map(([key, label, hint]) => <div className="admin-field" key={key}>
+              <label htmlFor={`setting-${key}`}>{label}</label>
+              {key === 'blogDescription' ? <textarea id={`setting-${key}`} rows={4} value={settings[key]} onChange={event => setSettings({ ...settings, [key]: event.target.value })} /> :
+                <input id={`setting-${key}`} type={['ogImage', 'githubUrl', 'twitterUrl'].includes(key) ? 'url' : 'text'} value={settings[key]} onChange={event => setSettings({ ...settings, [key]: event.target.value })} />}
+              {hint && <small>{hint}</small>}
+            </div>) : <>
+              <label className="flex items-start gap-3 rounded-lg border p-5"><input className="mt-1" type="checkbox" checked={settings.autoApproveComments} onChange={event => setSettings({ ...settings, autoApproveComments: event.target.checked })} /><span><span className="block text-sm font-medium">自动审核通过评论</span><span className="mt-2 block text-xs text-muted-foreground">开启后，评论将直接显示，无需人工审核。</span></span></label>
+              <label className="flex items-start gap-3 rounded-lg border p-5"><input className="mt-1" type="checkbox" checked={settings.requireEmailForComments} onChange={event => setSettings({ ...settings, requireEmailForComments: event.target.checked })} /><span><span className="block text-sm font-medium">评论时必须填写邮箱</span><span className="mt-2 block text-xs text-muted-foreground">要求访客留下邮箱，以便接收评论回复。</span></span></label>
+            </>}
+          </section>
+          <aside className="rounded-lg border bg-background p-5" aria-label="设置预览">
+            <p className="mb-5 text-xs text-muted-foreground">{tab === 'basic' ? '分享预览' : tab === 'social' ? '社交入口预览' : '评论规则预览'}</p>
+            {tab === 'basic' ? <>
+              {settings.ogImage ? <div className="mb-4 aspect-[1200/630] rounded-md bg-cover bg-center" role="img" aria-label="分享封面" style={{ backgroundImage: `url(${JSON.stringify(settings.ogImage)})` }} /> : <div className="mb-4 flex aspect-[1200/630] items-center justify-center rounded-md border bg-card text-xs text-muted-foreground">分享封面</div>}
+              <h3 className="break-words text-base font-semibold">{settings.blogName || '你的博客名称'}</h3>
+              <p className="mt-3 break-words text-sm leading-relaxed text-muted-foreground">{settings.blogDescription || '在这里，让读者认识你的博客。'}</p>
+            </> : tab === 'social' ? <div className="space-y-4 text-sm">{socialFields.map(([key, label]) => <div key={key}><strong>{label}</strong><p className="mt-1 break-all text-xs text-muted-foreground">{settings[key] || '未设置 · 不显示入口'}</p></div>)}</div> : <div className="space-y-4 text-sm leading-relaxed"><p>{settings.autoApproveComments ? '评论自动通过审核；命中敏感词时仍按审核规则处理。' : '新评论需要管理员审核后展示。'}</p><p>{settings.requireEmailForComments ? '提交评论时，访客需要填写邮箱。' : '邮箱为选填项。'}</p></div>}
+            <p className="mt-6 border-t pt-4 text-xs leading-relaxed text-muted-foreground">此处展示当前填写内容，保存后生效。</p>
+          </aside></div>
+          <div className="admin-dialog-footer"><p className="mr-auto text-xs text-muted-foreground">切换分组会保留未保存内容；保存将应用全部设置。</p><button type="submit" disabled={isSaving} className="admin-btn admin-btn-primary">{isSaving ? '保存中...' : '保存设置'}</button></div>
+        </form>
+      </AdminPanel>}
+  </div>
 }

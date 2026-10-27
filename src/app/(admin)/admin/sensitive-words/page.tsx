@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { AdminPageHeader, AdminPanel, AdminState, AdminDialog, AdminBadge, AdminPagination } from '@/components/admin/ui'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
 
@@ -17,48 +18,56 @@ export default function SensitiveWordsPage() {
   const [words, setWords] = useState<SensitiveWord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showDialog, setShowDialog] = useState(false)
   const [editingWord, setEditingWord] = useState<SensitiveWord | null>(null)
   const [formData, setFormData] = useState({ word: '', category: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
-    fetchWords()
-  }, [isAuthenticated, authLoading])
-
-  const fetchWords = async () => {
+  const fetchWords = useCallback(async () => {
     try {
       setIsLoading(true)
-      const result = await api.get('/sensitive-words') as { code: number; data: { items: SensitiveWord[]; total: number; totalPages: number }; message: string }
+      setLoadError(null)
+      const result = await api.get('/sensitive-words', { page, pageSize: 20 }) as { code: number; data: { items: SensitiveWord[]; total: number; totalPages: number }; message: string }
       if (result.code === 2000 && result.data) {
         setWords(result.data.items || [])
-      }
+        setTotalPages(result.data.totalPages || 1)
+        setTotal(result.data.total || 0)
+      } else { setLoadError(result.message || '获取敏感词失败') }
     } catch {
-      setError('获取敏感词失败')
+      setLoadError('获取敏感词失败')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page])
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return
+    void fetchWords()
+  }, [isAuthenticated, authLoading, fetchWords])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError(null)
 
     try {
       if (editingWord) {
         const result = await api.put(`/sensitive-words/${editingWord.id}`, formData)
-        if (result.code === 2000) {
+        if (result.code === 2000 || result.code === 2010) {
           fetchWords()
           closeDialog()
-        }
+        } else { setError(result.message || '保存敏感词失败，请重试') }
       } else {
         const result = await api.post('/sensitive-words', formData)
-        if (result.code === 2000) {
+        if (result.code === 2000 || result.code === 2010) {
           fetchWords()
           closeDialog()
-        }
+        } else { setError(result.message || '保存敏感词失败，请重试') }
       }
     } catch {
       setError(editingWord ? '更新敏感词失败' : '创建敏感词失败')
@@ -68,6 +77,7 @@ export default function SensitiveWordsPage() {
   }
 
   const handleEdit = (word: SensitiveWord) => {
+    setError(null)
     setEditingWord(word)
     setFormData({ word: word.word, category: word.category || '' })
     setShowDialog(true)
@@ -80,7 +90,7 @@ export default function SensitiveWordsPage() {
       const result = await api.delete(`/sensitive-words/${id}`)
       if (result.code === 2000) {
         fetchWords()
-      }
+      } else { setError(result.message || '操作失败，请重试') }
     } catch {
       setError('删除敏感词失败')
     }
@@ -94,7 +104,7 @@ export default function SensitiveWordsPage() {
       })
       if (result.code === 2000) {
         fetchWords()
-      }
+      } else { setError(result.message || '操作失败，请重试') }
     } catch {
       setError('更新状态失败')
     }
@@ -112,59 +122,29 @@ export default function SensitiveWordsPage() {
     return true
   })
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">敏感词管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理评论审核中的敏感词
-          </p>
-        </div>
-        <button
-          onClick={() => setShowDialog(true)}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          添加敏感词
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
-
+      <AdminPageHeader title="敏感词管理" description="维护评论审核词库，停用的词汇不会参与匹配。" actions={<button className="admin-btn admin-btn-primary" onClick={() => { setError(null); setShowDialog(true) }}>添加敏感词</button>} />
+      {error && !showDialog && <p role="alert" className="admin-notice admin-notice-error">{error}</p>}
+      <AdminPanel>
       {/* Filter */}
-      <div className="flex gap-1 p-1 bg-sidebar rounded-lg w-fit">
+      <div className="admin-tabs" aria-label="筛选敏感词（当前页）">
         {(['all', 'active', 'inactive'] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              filter === f
-                ? 'bg-background shadow-sm font-medium'
-                : 'hover:bg-background/50'
-            }`}
+            aria-pressed={filter === f}
+            data-active={filter === f}
           >
             {f === 'all' ? '全部' : f === 'active' ? '已启用' : '已禁用'}
           </button>
         ))}
       </div>
 
+      {authLoading || isLoading ? <AdminState kind="loading" title="正在加载敏感词…" /> : loadError ? <AdminState kind="error" title="词库加载失败" description={loadError} onRetry={() => void fetchWords()} /> : filteredWords.length === 0 ? <AdminState title="暂无敏感词" description="添加词汇后，即可用于评论审核。筛选仅作用于当前页。" /> : <>
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <table className="w-full">
+      <div className="admin-table-wrap">
+        <table className="admin-table admin-table-mobile">
           <thead className="bg-sidebar">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium">词汇</th>
@@ -184,11 +164,11 @@ export default function SensitiveWordsPage() {
             ) : (
               filteredWords.map((word) => (
                 <tr key={word.id}>
-                  <td className="px-4 py-3 font-mono">{word.word}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td data-label="词汇" className="font-medium">{word.word}</td>
+                  <td data-label="分类">
                     {word.category || '-'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="状态">
                     <button
                       onClick={() => handleToggle(word)}
                       className={`px-2 py-1 text-xs rounded-full transition-colors ${
@@ -197,22 +177,22 @@ export default function SensitiveWordsPage() {
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
-                      {word.isActive ? '已启用' : '已禁用'}
+                      <AdminBadge tone={word.isActive ? 'success' : 'neutral'}>{word.isActive ? '已启用' : '已禁用'}</AdminBadge>
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">
+                  <td data-label="添加时间">
                     {new Date(word.createdAt).toLocaleDateString('zh-CN')}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td data-label="操作">
                     <button
                       onClick={() => handleEdit(word)}
-                      className="px-3 py-1 text-sm hover:bg-accent rounded transition-colors"
+                      className="admin-btn admin-btn-ghost"
                     >
                       编辑
                     </button>
                     <button
                       onClick={() => handleDelete(word.id)}
-                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
+                      className="admin-btn admin-btn-danger"
                     >
                       删除
                     </button>
@@ -224,55 +204,17 @@ export default function SensitiveWordsPage() {
         </table>
       </div>
 
-      {/* Dialog */}
-      {showDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50" onClick={closeDialog} />
-          <div className="relative bg-background rounded-lg shadow-lg w-full max-w-md p-6">
-            <h2 className="text-lg font-bold mb-4">
-              {editingWord ? '编辑敏感词' : '添加敏感词'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">词汇</label>
-                <input
-                  type="text"
-                  value={formData.word}
-                  onChange={(e) => setFormData({ ...formData, word: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg font-mono"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">分类</label>
-                <input
-                  type="text"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="可选"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={closeDialog}
-                  className="px-4 py-2 border rounded-lg hover:bg-accent"
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {isSubmitting ? '保存中...' : '保存'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      </>}
+      {!isLoading && !loadError && <AdminPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />}
+      </AdminPanel>
+      {showDialog && <AdminDialog open onClose={closeDialog} busy={isSubmitting} title={editingWord ? '编辑敏感词' : '添加敏感词'} description="设置需要在评论审核中识别的词汇。">
+        <form onSubmit={handleSubmit} className="admin-form">
+          {error && <p role="alert" className="admin-notice admin-notice-error">{error}</p>}
+          <div className="admin-field"><label htmlFor="sensitive-word">词汇</label><input id="sensitive-word" value={formData.word} maxLength={50} required onChange={event => setFormData({ ...formData, word: event.target.value })} /></div>
+          <div className="admin-field"><label htmlFor="sensitive-category">分类</label><input id="sensitive-category" value={formData.category} maxLength={20} placeholder="可选" onChange={event => setFormData({ ...formData, category: event.target.value })} /></div>
+          <div className="admin-dialog-footer"><button type="button" className="admin-btn admin-btn-secondary" disabled={isSubmitting} onClick={closeDialog}>取消</button><button type="submit" className="admin-btn admin-btn-primary" disabled={isSubmitting}>{isSubmitting ? '保存中...' : '保存'}</button></div>
+        </form>
+      </AdminDialog>}
     </div>
   )
 }

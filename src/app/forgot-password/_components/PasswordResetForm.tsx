@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
+import { Eye, EyeOff, Check } from 'lucide-react'
 import { useCaptcha } from '@/client/hooks/useCaptcha'
 import { CaptchaInput } from '@/app/(admin)/_components/CaptchaInput'
 import { resetPasswordFormSchema, resetRequestFormSchema } from '@/shared/validations'
 
-const inputClass = 'w-full min-w-0 px-3 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50'
-const buttonClass = 'w-full py-2 px-3 rounded-lg font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed'
+const inputClass = 'w-full min-w-0'
+const buttonClass = 'admin-btn admin-btn-primary auth-submit'
 
 /** Store only an expiry timestamp; no mailbox, challenge or credential is persisted. */
 function useCooldown(key: string) {
@@ -63,6 +64,8 @@ export function PasswordResetForm() {
   const [step, setStep] = useState<'request' | 'confirm' | 'success'>('request')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
@@ -135,69 +138,80 @@ export function PasswordResetForm() {
   }
 
   return (
-    <div className="space-y-4">
-      {step !== 'success' && <ol aria-label="找回密码步骤" className="flex justify-center gap-5 text-sm">
+    <div className="auth-recovery">
+      {step !== 'success' && <ol aria-label="找回密码步骤" className="auth-recovery-steps">
         <li aria-current={step === 'request' ? 'step' : undefined} className={step === 'request' ? 'text-primary font-medium' : 'text-muted-foreground'}>1. 获取验证码</li>
         <li aria-current={step === 'confirm' ? 'step' : undefined} className={step === 'confirm' ? 'text-primary font-medium' : 'text-muted-foreground'}>2. 设置新密码</li>
       </ol>}
-      {error && <p role="alert" className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">{error}</p>}
-      {notice && <p role="status" className="p-3 text-sm bg-primary/5 border rounded-lg">{notice}</p>}
+      {error && <p role="alert" className="admin-notice admin-notice-error">{error}</p>}
+      {step === 'success' && <div className="auth-recovery-success" aria-hidden="true"><Check size={30} /></div>}
+      {notice && <p role="status" className="admin-notice">{notice}</p>}
 
-      {step === 'request' && <form onSubmit={send} noValidate className="space-y-4">
-        <fieldset disabled={!!busy} className="space-y-4 min-w-0">
-          <div className="space-y-2">
-            <label htmlFor="recovery-email" className="text-sm font-medium">注册邮箱</label>
+      {step === 'request' && <form onSubmit={send} noValidate className="auth-form">
+        <fieldset disabled={!!busy} className="auth-form min-w-0">
+          <div className="admin-field">
+            <label htmlFor="recovery-email" className="auth-recovery-label">注册邮箱</label>
             <input id="recovery-email" type="email" autoComplete="email" maxLength={254} required
               value={email} onChange={event => setEmail(event.target.value)} placeholder="请输入注册时使用的邮箱" className={inputClass} />
           </div>
-          <div className="space-y-2">
-            <label htmlFor="captcha" className="text-sm font-medium">图片验证码</label>
+          <div className="admin-field">
+            <label htmlFor="captcha" className="auth-recovery-label">图片验证码</label>
             <CaptchaInput captcha={captcha} />
           </div>
           <button type="submit" className={buttonClass} disabled={!!busy || !sendingCooldown.ready || sendingCooldown.seconds > 0 || captcha.loading || !captcha.id}>
             {busy === 'send' ? '发送中…' : sendingCooldown.seconds > 0 ? `${sendingCooldown.seconds} 秒后可发送` : '发送邮件验证码'}
           </button>
-          <button type="button" onClick={useExistingCode} className="w-full text-sm text-primary hover:underline">已有邮件验证码</button>
+          <button type="button" onClick={useExistingCode} className="admin-btn admin-btn-ghost auth-recovery-existing">已有邮件验证码</button>
         </fieldset>
       </form>}
 
       {step === 'confirm' && <>
         <p className="text-sm text-muted-foreground break-all">找回邮箱：{email}</p>
-        <form onSubmit={confirm} noValidate className="space-y-4">
-          <fieldset disabled={!!busy} className="space-y-4 min-w-0">
-            <div className="space-y-2">
-              <label htmlFor="recovery-code" className="text-sm font-medium">邮件验证码</label>
+        <form onSubmit={confirm} noValidate className="auth-form">
+          <fieldset disabled={!!busy} className="auth-form min-w-0">
+            <div className="admin-field">
+              <label htmlFor="recovery-code" className="auth-recovery-label">邮件验证码</label>
               <input ref={codeInput} id="recovery-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required
                 value={code} onChange={event => setCode(event.target.value)} placeholder="输入 6 位数字验证码" className={inputClass} aria-describedby="recovery-code-hint" />
               <p id="recovery-code-hint" className="text-xs text-muted-foreground">验证码 10 分钟内有效。重发后请使用最新邮件中的验证码。</p>
             </div>
-            <div className="space-y-2">
-              <label htmlFor="recovery-password" className="text-sm font-medium">新密码</label>
-              <input id="recovery-password" type="password" autoComplete="new-password" required value={newPassword}
-                onChange={event => setNewPassword(event.target.value)} placeholder="至少 6 位，最多 72 字节" className={inputClass} />
+            <div className="admin-field">
+              <label htmlFor="recovery-password" className="auth-recovery-label">新密码</label>
+              <div className="auth-password">
+                <input id="recovery-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required value={newPassword}
+                  onChange={event => setNewPassword(event.target.value)} placeholder="至少 6 位，最多 72 字节" className={inputClass} />
+                <button type="button" className="auth-password-toggle" aria-label={showPassword ? '隐藏新密码' : '显示新密码'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>
+                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label htmlFor="recovery-confirm" className="text-sm font-medium">确认新密码</label>
-              <input id="recovery-confirm" type="password" autoComplete="new-password" required value={confirmPassword}
-                onChange={event => setConfirmPassword(event.target.value)} placeholder="再次输入新密码" className={inputClass} />
+            <div className="admin-field">
+              <label htmlFor="recovery-confirm" className="auth-recovery-label">确认新密码</label>
+              <div className="auth-password">
+                <input id="recovery-confirm" type={showConfirmation ? 'text' : 'password'} autoComplete="new-password" required value={confirmPassword}
+                  onChange={event => setConfirmPassword(event.target.value)} placeholder="再次输入新密码" className={inputClass} />
+                <button type="button" className="auth-password-toggle" aria-label={showConfirmation ? '隐藏确认新密码' : '显示确认新密码'} aria-pressed={showConfirmation} onClick={() => setShowConfirmation(value => !value)}>
+                  {showConfirmation ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
+              </div>
             </div>
             <button type="submit" className={buttonClass} disabled={!!busy || !checkingCooldown.ready || checkingCooldown.seconds > 0}>
               {busy === 'confirm' ? '重置中…' : checkingCooldown.seconds > 0 ? `${checkingCooldown.seconds} 秒后可重试` : '重置密码'}
             </button>
           </fieldset>
         </form>
-        <div className="border-t pt-4 space-y-3">
-          <div className="flex justify-between gap-3 text-sm">
+        <div className="auth-recovery-resend">
+          <div className="auth-recovery-actions">
             <button type="button" disabled={!!busy || sendingCooldown.seconds > 0 || !sendingCooldown.ready}
-              onClick={() => { setError(''); setResending(true); void captcha.refresh() }} className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline">
+              onClick={() => { setError(''); setResending(true); void captcha.refresh() }} className="admin-btn admin-btn-ghost">
               {sendingCooldown.seconds > 0 ? `${sendingCooldown.seconds} 秒后可重发` : '重新发送'}
             </button>
-            <button type="button" disabled={!!busy} className="text-muted-foreground hover:underline"
+            <button type="button" disabled={!!busy} className="admin-btn admin-btn-ghost"
               onClick={() => { setStep('request'); setError(''); setNotice(''); setCode(''); setNewPassword(''); setConfirmPassword(''); setResending(false); void captcha.refresh() }}>更换邮箱</button>
           </div>
-          {resending && <form onSubmit={send} noValidate className="space-y-3">
-            <fieldset disabled={!!busy} className="space-y-3 min-w-0">
-              <label htmlFor="captcha" className="text-sm font-medium">重新发送前，请填写新的图片验证码</label>
+          {resending && <form onSubmit={send} noValidate className="auth-form">
+            <fieldset disabled={!!busy} className="auth-form min-w-0">
+              <label htmlFor="captcha" className="auth-recovery-label">重新发送前，请填写新的图片验证码</label>
               <CaptchaInput captcha={captcha} />
               <button type="submit" disabled={!!busy || sendingCooldown.seconds > 0 || captcha.loading || !captcha.id} className={buttonClass}>
                 {busy === 'send' ? '发送中…' : '发送新验证码'}
@@ -207,7 +221,7 @@ export function PasswordResetForm() {
         </div>
       </>}
 
-      <p className="text-center text-sm"><Link href="/login" className="text-primary hover:underline">返回登录</Link></p>
+      <p className="auth-switch"><Link href="/login" className={step === 'success' ? 'admin-btn admin-btn-primary auth-recovery-return' : undefined}>返回登录</Link></p>
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { clsx } from 'clsx'
+import { AdminPageHeader, AdminBadge, AdminState } from '@/components/admin/ui'
 import { api } from '@/client/api'
 import { PERMISSION_DEFINITIONS, type Permission } from '@/shared/permissions'
 import { ROLE_DEFINITIONS } from '@/shared/roles'
@@ -56,14 +57,11 @@ export default function RoleManager() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">角色管理</h1>
-        <p className="mt-1 text-sm text-muted-foreground">查看角色成员与权限，配置编辑者和审核者的业务权限</p>
-      </div>
+      <AdminPageHeader title="角色管理" description="按角色分配权限，让每位成员专注于自己的工作。" />
       {notice && !loading && !error && <p role="status" className="text-sm text-green-700">{notice}</p>}
 
       {loading ? (
-        <p role="status" className="py-12 text-center text-muted-foreground">正在加载角色...</p>
+        <AdminState kind="loading" title="正在加载角色..." />
       ) : error ? (
         <div role="alert" className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           <p>{error}</p>
@@ -80,8 +78,8 @@ export default function RoleManager() {
             </p>
           )}
           {selectedRole && (
-            <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-              <nav aria-label="角色列表" className="space-y-2">
+            <div className="grid items-start gap-6 lg:grid-cols-[270px_minmax(0,1fr)]">
+              <nav aria-label="角色列表" className="space-y-4">
                 {roles.map(role => (
                   <button
                     key={role.id}
@@ -89,21 +87,20 @@ export default function RoleManager() {
                     disabled={saving}
                     aria-pressed={selectedRole.id === role.id}
                     onClick={() => { setSelectedId(role.id); setEditingId(null); setNotice(null) }}
-                    className={clsx('flex w-full items-center justify-between gap-3 rounded-lg border p-4 text-left disabled:opacity-50',
+                    className={clsx('flex w-full items-center justify-between gap-3 rounded-lg border p-5 text-left disabled:opacity-50',
                       selectedRole.id === role.id ? 'border-primary bg-primary/10' : 'bg-card hover:bg-accent/50')}
                   >
-                    <span className="font-medium">{ROLE_DEFINITIONS[role.name].label}</span>
-                    <span className="text-xs text-muted-foreground">{role.memberCount} 位成员</span>
+                    <span className="block w-full"><span className="flex items-center justify-between gap-3"><span className="font-semibold">{ROLE_DEFINITIONS[role.name].label}</span><span className="text-xs text-muted-foreground">{role.memberCount} 人</span></span><span className="mt-3 block text-xs leading-relaxed text-muted-foreground">{ROLE_DEFINITIONS[role.name].description}</span></span>
                   </button>
                 ))}
               </nav>
 
-              <section aria-label="角色详情" className="space-y-5 rounded-lg border bg-card p-5 md:p-6">
+              <section aria-label="角色详情" className="admin-panel space-y-5 p-6 md:p-8">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-xl font-semibold">{ROLE_DEFINITIONS[selectedRole.name].label}</h2>
                     {(selectedRole.name === 'admin' || selectedRole.name === 'member') && (
-                      <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">权限只读</span>
+                      <AdminBadge>权限只读</AdminBadge>
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -112,7 +109,7 @@ export default function RoleManager() {
                   <p className="text-sm">有效成员：{selectedRole.memberCount} 人</p>
                   {can('role:update') && (selectedRole.name === 'editor' || selectedRole.name === 'reviewer') && editingId !== selectedRole.id && (
                     <button type="button" onClick={() => { setEditingId(selectedRole.id); setNotice(null) }}
-                      className="rounded-lg border px-3 py-1.5 text-sm hover:bg-accent">编辑权限</button>
+                      className="admin-btn admin-btn-primary">编辑权限</button>
                   )}
                 </div>
 
@@ -130,12 +127,12 @@ export default function RoleManager() {
                   {groups.size === 0 ? (
                     <p className="text-sm text-muted-foreground">该角色暂无后台权限</p>
                   ) : (
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-6">
                       {Array.from(groups, ([group, codes]) => (
-                        <div key={group} className="rounded-lg border p-4">
-                          <h4 className="mb-3 text-sm font-medium">{group}</h4>
-                          <ul className="space-y-2 text-sm text-muted-foreground">
-                            {codes.map(code => <li key={code}>{PERMISSION_DEFINITIONS[code].label}</li>)}
+                        <div key={group} className="grid gap-4 border-b pb-6 last:border-0 md:grid-cols-[130px_minmax(0,1fr)]">
+                          <h4 className="text-sm font-medium text-muted-foreground">{group}</h4>
+                          <ul className="grid gap-4 text-sm sm:grid-cols-2">
+                            {codes.map(code => <li key={code} className="flex items-center gap-2"><span aria-hidden="true" className="text-primary">✓</span><span>{PERMISSION_DEFINITIONS[code].label}</span></li>)}
                           </ul>
                         </div>
                       ))}
@@ -143,6 +140,7 @@ export default function RoleManager() {
                   )}
                   </>}
                 </div>
+                <p className="admin-notice text-xs">管理员与普通会员权限只读；业务权限变更适用于该角色的所有成员。</p>
               </section>
             </div>
           )}

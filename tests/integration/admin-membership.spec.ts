@@ -185,7 +185,7 @@ test('self-demotion refreshes the page permissions while keeping the same signed
   await dialog.getByRole('checkbox', { name: '管理员', exact: true }).uncheck()
   await dialog.getByRole('checkbox', { name: '普通会员', exact: true }).check()
   await dialog.getByRole('button', { name: '保存角色', exact: true }).click()
-  await expect(page.getByText(/此账号没有访问该页面的权限。|当前账号尚未获得管理权限，请联系博主。/)).toBeVisible()
+  await expect(page.getByText(/此账号没有访问该页面的权限。|当前账号没有后台访问权限/)).toBeVisible()
   await expect(page.getByRole('button', { name: /^分配角色：/ })).toHaveCount(0)
   const session = await (await page.context().request.get('/api/auth/session')).json()
   expect(session.user.id).toBe(operator.id)

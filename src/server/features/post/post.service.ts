@@ -23,6 +23,9 @@ export async function getPosts(params: PostListParams, actor?: Actor) {
     where.status = 'PUBLISHED'
   }
 
+  const search = params.search?.trim()
+  if (search) where.title = { contains: search }
+
   if (categoryId) {
     where.categoryId = categoryId
   }
@@ -227,7 +230,7 @@ export async function getAdjacentPosts(categoryId: string | null, currentId: str
       id: { not: currentId },
       ...(categoryId
         ? { categoryId, [sortField]: { gt: sortValue } }
-        : { categoryId: { is: Prisma.DbNull }, [sortField]: { gt: sortValue } }
+        : { categoryId: null, [sortField]: { gt: sortValue } }
       ),
     } as Prisma.PostWhereInput,
     orderBy: { [sortField]: 'asc' },
@@ -247,7 +250,7 @@ export async function getAdjacentPosts(categoryId: string | null, currentId: str
       id: { not: currentId },
       ...(categoryId
         ? { categoryId, [sortField]: { lt: sortValue } }
-        : { categoryId: { is: Prisma.DbNull }, [sortField]: { lt: sortValue } }
+        : { categoryId: null, [sortField]: { lt: sortValue } }
       ),
     } as Prisma.PostWhereInput,
     orderBy: { [sortField]: 'desc' },

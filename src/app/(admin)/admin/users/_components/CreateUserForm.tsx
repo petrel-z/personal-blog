@@ -71,7 +71,7 @@ export function CreateUserForm({ saving, onSavingChange, onSaved }: Props) {
   }
 
   return (
-    <form aria-label="创建用户" onSubmit={handleSubmit(submit)} className="space-y-4 rounded-lg border bg-card p-6">
+    <form aria-label="创建用户" onSubmit={handleSubmit(submit)} className="admin-panel admin-form p-6">
       <h2 className="text-lg font-semibold">创建用户</h2>
       {loading && <p role="status" className="text-sm text-muted-foreground">正在加载角色...</p>}
       {loadError && (
@@ -80,7 +80,7 @@ export function CreateUserForm({ saving, onSavingChange, onSaved }: Props) {
           <button type="button" onClick={() => setAttempt(value => value + 1)} className="rounded border border-current px-3 py-1">重试</button>
         </div>
       )}
-      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && <p role="alert" className="admin-notice admin-notice-error">{error}</p>}
       <fieldset disabled={saving || loading || !!loadError} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           {([
@@ -89,7 +89,7 @@ export function CreateUserForm({ saving, onSavingChange, onSaved }: Props) {
             ['password', '密码', 'password', '至少6位，最多72字节', 'new-password'],
             ['confirmPassword', '确认密码', 'password', '再次输入密码', 'new-password'],
           ] as const).map(([key, label, type, placeholder, autoComplete]) => (
-            <div key={key} className="space-y-2">
+            <div key={key} className="admin-field">
               <label htmlFor={`managed-${key}`} className="text-sm font-medium">{label}</label>
               <input id={`managed-${key}`} type={type} placeholder={placeholder} autoComplete={autoComplete}
                 aria-invalid={!!errors[key]} aria-describedby={errors[key] ? `managed-${key}-error` : undefined}
@@ -112,7 +112,7 @@ export function CreateUserForm({ saving, onSavingChange, onSaved }: Props) {
           {errors.roleIds && <p className="text-xs text-red-600">{errors.roleIds.message}</p>}
           <p className="text-sm text-muted-foreground">普通会员没有后台权限；选择管理员将授予完整后台权限。</p>
         </fieldset>
-        <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
+        <button type="submit" className="admin-btn admin-btn-primary">
           {saving ? '创建中...' : '创建用户'}
         </button>
       </fieldset>

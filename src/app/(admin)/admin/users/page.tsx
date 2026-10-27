@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { AdminPageHeader, AdminPanel, AdminState, AdminBadge } from '@/components/admin/ui'
 import { api } from '@/client/api'
 import { useAuth } from '../../_components'
 import { ROLE_DEFINITIONS } from '@/shared/roles'
@@ -35,7 +36,7 @@ export default function UsersPage() {
   const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
+    if (authLoading || !isAuthenticated) return
     fetchUsers()
   }, [isAuthenticated, authLoading])
 
@@ -59,40 +60,9 @@ export default function UsersPage() {
     }
   }
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">用户管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理系统用户账户
-          </p>
-        </div>
-        {can('user:create') && (
-          <button type="button" disabled={isCreating}
-            onClick={() => { setShowCreateForm(value => !value); setCreateSuccess(null) }}
-            className="rounded-lg bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-            {showCreateForm ? '取消添加' : '添加用户'}
-          </button>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
-
+      <AdminPageHeader title="用户管理" description="管理账户与角色，为每位成员分配合适的访问权限。" actions={can('user:create') && <button type="button" disabled={isCreating} onClick={() => { setShowCreateForm(value => !value); setCreateSuccess(null) }} className="admin-btn admin-btn-primary">{showCreateForm ? '取消添加' : '添加用户'}</button>} />
       {createSuccess && <p role="status" className="text-sm text-green-700">{createSuccess}</p>}
       {can('user:create') && showCreateForm && (
         <CreateUserForm saving={isCreating} onSavingChange={setIsCreating}
@@ -106,8 +76,9 @@ export default function UsersPage() {
 
       {/* Users Table */}
       {roleSuccess && <p role="status" className="text-sm text-green-700">{roleSuccess}</p>}
-      <div className="border rounded-lg overflow-x-auto">
-        <table className="w-full">
+      <AdminPanel title="全部用户" description={`共 ${users.length} 位成员`}>
+      {authLoading || isLoading ? <AdminState kind="loading" title="正在加载用户…" /> : error ? <AdminState kind="error" title="用户列表暂不可用" description={error} onRetry={() => void fetchUsers()} /> : users.length === 0 ? <AdminState title="暂无用户" /> : <div className="admin-table-wrap">
+        <table className="admin-table admin-table-mobile">
           <thead className="bg-sidebar">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium">用户名</th>
@@ -128,7 +99,7 @@ export default function UsersPage() {
             ) : (
               users.map((user) => (
                 <tr key={user.id} className="hover:bg-accent/50">
-                  <td className="px-4 py-3">
+                  <td data-label="用户名">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-sm font-medium text-primary">
@@ -138,37 +109,37 @@ export default function UsersPage() {
                       <span className="font-medium">{user.name || '-'}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td data-label="邮箱">
                     {user.email}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="角色">
                     {user.roles.length === 0 ? (
                       <span className="text-sm text-muted-foreground">未分配</span>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {user.roles.map(role => (
-                          <span key={role.id} className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                          <AdminBadge key={role.id} tone={role.name === 'admin' ? 'blue' : 'neutral'}>
                             {Object.hasOwn(ROLE_DEFINITIONS, role.name)
                               ? ROLE_DEFINITIONS[role.name as BuiltinRoleName].label
                               : role.name}
-                          </span>
+                          </AdminBadge>
                         ))}
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="文章数">
                     {user._count.posts}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">
+                  <td data-label="注册时间">
                     {new Date(user.createdAt).toLocaleDateString('zh-CN')}
                   </td>
                   {canAssignRoles && (
-                    <td className="px-4 py-3">
+                    <td data-label="操作">
                       <button
                         type="button"
                         aria-label={`分配角色：${user.email}`}
                         onClick={() => { setRoleSuccess(null); setEditingUser(user) }}
-                        className="whitespace-nowrap text-sm text-primary hover:underline"
+                        className="admin-btn admin-btn-ghost"
                       >分配角色</button>
                     </td>
                   )}
@@ -177,7 +148,8 @@ export default function UsersPage() {
             )}
           </tbody>
         </table>
-      </div>
+      </div>}
+      </AdminPanel>
       {canAssignRoles && editingUser && (
         <UserRoleEditor
           key={editingUser.id}

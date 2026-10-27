@@ -197,5 +197,5 @@ test('role loading failures can retry and submission failures keep the form and 
     await expect(page.getByRole('button', { name: '取消添加', exact: true })).toBeDisabled()
     await expect(form.getByRole('checkbox', { name: '普通会员', exact: true })).toBeDisabled()
   } finally { release() }
-  await expect(page.getByRole('status')).toContainText('用户创建成功')
+  await expect(page.getByRole('status').filter({ hasText: '用户创建成功' })).toBeVisible()
 })

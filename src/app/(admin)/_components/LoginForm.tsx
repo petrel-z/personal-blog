@@ -7,7 +7,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { clsx } from 'clsx'
+import Link from 'next/link'
+import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react'
 import { loginSchema, type LoginInput } from '@/shared/validations'
 import { CaptchaInput } from './CaptchaInput'
 
@@ -17,6 +18,7 @@ export function LoginForm() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard'
 
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [retryAfter, setRetryAfter] = useState(0)
@@ -92,79 +94,33 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {/* Email */}
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium">
-          邮箱
-        </label>
-        <input
-          id="email"
-          type="email"
-          placeholder="admin@example.com"
-          className={clsx(
-            'w-full px-3 py-2 border rounded-lg bg-background',
-            'focus:outline-none focus:ring-2 focus:ring-primary/50',
-            errors.email && 'border-red-500 focus:ring-red-500/50'
-          )}
-          {...register('email')}
-        />
-        {errors.email && (
-          <p className="text-xs text-red-500">{errors.email.message}</p>
-        )}
+    <form onSubmit={handleSubmit(onSubmit)} className="auth-form" aria-busy={isLoading}>
+      <div className="admin-field">
+        <label htmlFor="email">邮箱</label>
+        <input id="email" type="email" autoComplete="email" placeholder="输入你的邮箱"
+          aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-error' : undefined} {...register('email')} />
+        {errors.email && <p id="email-error" role="alert" className="auth-field-error">{errors.email.message}</p>}
       </div>
-
-      {/* Password */}
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium">
-          密码
-        </label>
-        <input
-          id="password"
-          type="password"
-          placeholder="••••••••"
-          className={clsx(
-            'w-full px-3 py-2 border rounded-lg bg-background',
-            'focus:outline-none focus:ring-2 focus:ring-primary/50',
-            errors.password && 'border-red-500 focus:ring-red-500/50'
-          )}
-          {...register('password')}
-        />
-        {errors.password && (
-          <p className="text-xs text-red-500">{errors.password.message}</p>
-        )}
-      </div>
-
-      {/* Captcha */}
-      <div className="space-y-2">
-        <label htmlFor="captcha" className="text-sm font-medium">
-          验证码
-        </label>
-        <CaptchaInput
-          captcha={captcha}
-          error={errors.captcha?.message}
-        />
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg">
-          {error}
+      <div className="admin-field">
+        <div className="auth-password-label"><label htmlFor="password">密码</label><Link href="/forgot-password">忘记密码？</Link></div>
+        <div className="auth-password">
+          <input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="输入密码"
+            aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-error' : undefined} {...register('password')} />
+          <button type="button" className="auth-password-toggle" aria-label={showPassword ? '隐藏密码' : '显示密码'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>
+            {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+          </button>
         </div>
-      )}
-
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={isLoading || captcha.loading || !captcha.id || retryAfter > 0}
-        className={clsx(
-          'w-full py-2 rounded-lg font-medium transition-colors',
-          'bg-primary text-primary-foreground',
-          'hover:bg-primary/90',
-          'disabled:opacity-50 disabled:cursor-not-allowed'
-        )}
-      >
+        {errors.password && <p id="password-error" role="alert" className="auth-field-error">{errors.password.message}</p>}
+      </div>
+      <div className="admin-field">
+        <label htmlFor="captcha">图形验证码</label>
+        <CaptchaInput captcha={captcha} error={errors.captcha?.message} />
+      </div>
+      {error && <div role="alert" className="admin-notice admin-notice-error">{error}</div>}
+      <button type="submit" disabled={isLoading || captcha.loading || !captcha.id || retryAfter > 0} className="admin-btn admin-btn-primary auth-submit">
+        {isLoading && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
         {retryAfter > 0 ? `${retryAfter} 秒后重试` : isLoading ? '登录中...' : '登录'}
+        {!isLoading && retryAfter === 0 && <ArrowRight size={16} aria-hidden="true" />}
       </button>
     </form>
   )

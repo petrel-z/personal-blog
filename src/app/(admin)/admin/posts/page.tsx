@@ -1,270 +1,61 @@
 'use client'
-
-import React, { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { postStatusFilter } from '@/components/admin/content-editor-state'
 import { api } from '@/client/api'
-import { PermissionGate } from '../../_components/PermissionGate'
 import { useAuth } from '../../_components'
-import { useToast } from '@/components/ui/toaster'
-import type { PostWithRelations } from '@/shared/types'
-
+import type { PostWithRelations, Category } from '@/shared/types'
+import { AdminBadge, AdminDialog, AdminPageHeader, AdminPagination, AdminPanel, AdminSearch, AdminState } from '@/components/admin/ui'
+const statuses = { all: '全部文章', PUBLISHED: '已发布', DRAFT: '草稿', ARCHIVED: '已归档' }
 export default function PostsPage() {
   const { isAuthenticated, isLoading: authLoading, can } = useAuth()
-  const { toast } = useToast()
   const [posts, setPosts] = useState<PostWithRelations[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [filter, setFilter] = useState<'all' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED'>('all')
+  const [filter, setFilter] = useState<keyof typeof statuses>('all')
+  const [filterReady, setFilterReady] = useState(false)
+  useEffect(() => { setFilter(postStatusFilter(new URLSearchParams(window.location.search).get('status'))); setFilterReady(true) }, [])
   const [search, setSearch] = useState('')
-
-  const fetchPosts = useCallback(async () => {
+  const [category, setCategory] = useState('')
+  const [query, setQuery] = useState('')
+  const [total, setTotal] = useState(0)
+  const [pages, setPages] = useState(1)
+  const requestId = useRef(0)
+  useEffect(() => { const timer = setTimeout(() => { setQuery(search); setPage(1) }, 250); return () => clearTimeout(timer) }, [search])
+  const [deleting, setDeleting] = useState<PostWithRelations | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const load = useCallback(async () => {
+    const request = ++requestId.current
+    setLoading(true); setError('')
     try {
-      setIsLoading(true)
-      const params: Record<string, string | number> = { page, pageSize: 10, scope: 'admin' }
-      if (filter !== 'all') {
-        params.status = filter
-      }
-
-      const result = await api.get('/posts', params) as { code: number; data: { items: PostWithRelations[]; total: number; totalPages: number }; message: string }
-
-      if (result.code === 2000 && result.data) {
-        // Filter by search if needed (client-side for simplicity)
-        let filteredPosts = result.data.items || []
-        if (search) {
-          filteredPosts = filteredPosts.filter(p =>
-            p.title.toLowerCase().includes(search.toLowerCase())
-          )
-        }
-        setPosts(filteredPosts)
-        setTotal(result.data.total ?? 0)
-        setTotalPages(result.data.totalPages || 1)
-      }
-    } catch {
-      toast({ title: '获取文章列表失败', variant: 'error' })
-    } finally {
-      setIsLoading(false)
-    }
-  }, [page, filter, search, toast])
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
-    fetchPosts()
-  }, [isAuthenticated, authLoading, fetchPosts])
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这篇文章吗？')) return
-
+      const [result, cs] = await Promise.all([api.get('/posts', { scope: 'admin', page, pageSize: 10, ...(filter !== 'all' ? { status: filter } : {}), ...(category ? { categoryId: category } : {}), ...(query.trim() ? { search: query.trim() } : {}) }), api.get('/categories')])
+      if (request !== requestId.current) return
+      if (result.code !== 2000 || !result.data) throw new Error(result.message || '获取文章失败')
+      if (cs.code !== 2000 || !Array.isArray(cs.data)) throw new Error(cs.message || '获取分类失败')
+      const data = result.data as { items: PostWithRelations[]; total: number; totalPages: number }
+      if (page > Math.max(1, data.totalPages)) { setPage(Math.max(1, data.totalPages)); return }
+      setPosts(data.items); setTotal(data.total); setPages(Math.max(1, data.totalPages)); setCategories(cs.data as Category[])
+    } catch (e) { if (request === requestId.current) setError(e instanceof Error ? e.message : '加载失败，请重试') } finally { if (request === requestId.current) setLoading(false) }
+  }, [page, filter, category, query])
+  useEffect(() => { const sequence = requestId; if (!authLoading && isAuthenticated && filterReady) void load(); return () => { sequence.current++ } }, [authLoading, isAuthenticated, filterReady, load])
+  const filtered = posts
+  const current = page
+  async function remove() {
+    if (!deleting || busy || !can('post:delete')) return
+    setBusy(true); setDeleteError('')
     try {
-      const result = await api.delete(`/posts/${id}`)
-      if (result.code === 2000) {
-        toast({ title: '文章删除成功', variant: 'success' })
-        fetchPosts()
-      }
-    } catch {
-      toast({ title: '删除文章失败', variant: 'error' })
-    }
+      const result = await api.delete(`/posts/${deleting.id}`)
+      if (result.code !== 2000) throw new Error(result.message || '删除文章失败')
+      setDeleting(null); void load()
+    } catch (e) { setDeleteError(e instanceof Error ? e.message : '删除失败，请重试') } finally { setBusy(false) }
   }
-
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      PUBLISHED: 'bg-green-100 text-green-700',
-      DRAFT: 'bg-yellow-100 text-yellow-700',
-      ARCHIVED: 'bg-gray-100 text-gray-700',
-      DELETED: 'bg-red-100 text-red-700',
-    }
-    const labels = {
-      PUBLISHED: '已发布',
-      DRAFT: '草稿',
-      ARCHIVED: '归档',
-      DELETED: '已删除',
-    }
-    return (
-      <span className={`px-2 py-1 text-xs rounded-full ${styles[status as keyof typeof styles] || styles.DRAFT}`}>
-        {labels[status as keyof typeof labels] || status}
-      </span>
-    )
-  }
-
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">文章管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            共 {total} 篇文章
-          </p>
-        </div>
-        <PermissionGate permission="post:create"><Link
-          href="/admin/posts/new"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          写文章
-        </Link></PermissionGate>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        {/* Search */}
-        <div className="relative flex-1">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            type="text"
-            placeholder="搜索文章标题..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg bg-background"
-          />
-        </div>
-
-        {/* Status Filter */}
-        <div className="flex gap-1 p-1 bg-sidebar rounded-lg">
-          {(['all', 'PUBLISHED', 'DRAFT', 'ARCHIVED'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => {
-                setFilter(f)
-                setPage(1)
-              }}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                filter === f
-                  ? 'bg-background shadow-sm font-medium'
-                  : 'hover:bg-background/50'
-              }`}
-            >
-              {f === 'all' ? '全部' : f === 'PUBLISHED' ? '已发布' : f === 'DRAFT' ? '草稿' : '归档'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-sidebar">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium">标题</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">分类</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">阅读量</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">评论数</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">发布时间</th>
-              <th className="px-4 py-3 text-right text-sm font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {posts.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                  暂无文章
-                </td>
-              </tr>
-            ) : (
-              posts.map((post) => (
-                <tr key={post.id} className="hover:bg-accent/50">
-                  <td className="px-4 py-3">
-                    {can('post:update') ? (
-                      <Link
-                        href={`/admin/posts/${post.id}`}
-                        className="font-medium hover:text-primary hover:underline"
-                      >
-                        {post.title}
-                      </Link>
-                    ) : <span className="font-medium">{post.title}</span>}
-                    <div className="flex gap-1 mt-1">
-                      {post.tags.slice(0, 3).map((tag) => (
-                        <span key={tag.id} className="text-xs px-1.5 py-0.5 bg-sidebar rounded text-muted-foreground">
-                          {tag.name}
-                        </span>
-                      ))}
-                      {post.tags.length > 3 && (
-                        <span className="text-xs text-muted-foreground">+{post.tags.length - 3}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">
-                    {post.category?.name || '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {getStatusBadge(post.status)}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm">
-                    {post.viewCount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm">
-                    {post.commentCount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">
-                    {post.publishedAt
-                      ? new Date(post.publishedAt).toLocaleDateString('zh-CN')
-                      : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <PermissionGate permission="post:update"><Link
-                      href={`/admin/posts/${post.id}`}
-                      className="px-3 py-1 text-sm hover:bg-accent rounded transition-colors"
-                    >
-                      编辑
-                    </Link></PermissionGate>
-                    <PermissionGate permission="post:delete"><button
-                      onClick={() => handleDelete(post.id)}
-                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-                    >
-                      删除
-                    </button></PermissionGate>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-3 py-1.5 border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            上一页
-          </button>
-          <span className="px-3 py-1.5 text-sm text-muted-foreground">
-            第 {page} / {totalPages} 页
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="px-3 py-1.5 border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            下一页
-          </button>
-        </div>
-      )}
-    </div>
-  )
+  return <div className="space-y-6"><AdminPageHeader title="文章管理" description="记录想法，整理知识，持续创作。" actions={can('post:create') && <Link href="/admin/posts/new" className="admin-btn admin-btn-primary">＋ 写文章</Link>} />
+    <AdminPanel><div className="admin-tabs" role="tablist" aria-label="文章状态">{Object.entries(statuses).map(([key, label]) => <button role="tab" key={key} aria-selected={filter === key} onClick={() => { setFilter(key as keyof typeof statuses); setPage(1) }}>{label}</button>)}</div>
+      <div className="admin-toolbar"><AdminSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="搜索文章标题…" /><label className="admin-field"><span className="sr-only">筛选分类</span><select value={category} onChange={e => { setCategory(e.target.value); setPage(1) }}><option value="">全部分类</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label></div>
+      {authLoading || loading ? <AdminState kind="loading" /> : error ? <AdminState kind="error" description={error} onRetry={load} /> : !filtered.length ? <AdminState kind="empty" title="暂无符合条件的文章" description="尝试调整筛选条件，或开始写一篇文章。" /> : <div className="admin-table-wrap"><table className="admin-table admin-table-mobile"><thead><tr><th>文章标题</th><th>分类</th><th>状态</th><th>阅读 / 评论</th><th>发布时间</th><th>操作</th></tr></thead><tbody>{filtered.map(p => <tr key={p.id}><td data-label="文章标题">{can('post:update') ? <Link href={`/admin/posts/${p.id}`}><strong>{p.title}</strong></Link> : <strong>{p.title}</strong>}<div className="text-xs text-muted-foreground mt-2">{p.tags.map(t => `#${t.name}`).join('　')}</div></td><td data-label="分类">{p.category?.name || '未分类'}</td><td data-label="状态"><AdminBadge tone={p.status === 'PUBLISHED' ? 'success' : p.status === 'DRAFT' ? 'warning' : 'neutral'}>{statuses[p.status as keyof typeof statuses] || p.status}</AdminBadge></td><td data-label="阅读 / 评论">{p.viewCount.toLocaleString()} / {p.commentCount.toLocaleString()}</td><td data-label="发布时间">{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString('zh-CN') : '—'}</td><td data-label="操作"><div className="admin-row-actions">{can('post:update') && <Link className="admin-btn admin-btn-ghost" href={`/admin/posts/${p.id}`}>编辑</Link>}{can('post:delete') && <button className="admin-btn admin-btn-danger" onClick={() => { setDeleting(p); setDeleteError('') }}>删除</button>}</div></td></tr>)}</tbody></table></div>}
+      {!loading && !error && <AdminPagination page={current} totalPages={pages} total={total} onPageChange={setPage} />}
+    </AdminPanel><AdminDialog open={!!deleting} onClose={() => setDeleting(null)} title="删除文章" description={`确定删除「${deleting?.title || ''}」？文章将从列表中移除。`} busy={busy}>{deleteError && <p className="admin-notice admin-notice-error" role="alert">{deleteError}</p>}<div className="admin-dialog-footer"><button disabled={busy} className="admin-btn admin-btn-secondary" onClick={() => setDeleting(null)}>取消</button><button disabled={busy} className="admin-btn admin-btn-danger" onClick={remove}>{busy ? '删除中…' : '确认删除'}</button></div></AdminDialog></div>
 }
