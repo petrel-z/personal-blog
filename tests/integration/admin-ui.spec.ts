@@ -37,7 +37,7 @@ for (const width of [1440, 390]) {
     expect(result.searchParams.has('error')).toBe(false)
     for (const route of ['dashboard', 'posts', 'posts/new', `posts/${postId}`, 'categories', 'tags', 'comments', 'stats/views', 'stats/popular', 'users', 'roles', 'sensitive-words', 'audit-logs', 'settings']) {
       await page.goto(`/admin/${route}`)
-      await expect(page.locator('main h1')).toBeVisible()
+      await expect(page.locator('main h1').first()).toBeVisible()
       if (route.startsWith('posts/')) await expect(page.getByRole('textbox', { name: '文章正文' })).toBeVisible()
       await expect(page.locator('.admin-state').filter({ hasText: /加载|打开/ })).toHaveCount(0)
       await expect(page.locator('main [role="alert"]')).toHaveCount(0)
@@ -70,7 +70,7 @@ test('editor preserves a failed save and restores a tab draft after reload', asy
   await page.reload()
   await page.getByRole('button', { name: '恢复草稿', exact: true }).click()
   await expect(page.getByLabel('文章标题', { exact: true })).toHaveValue('尚未保存的创作')
-  await expect(page.getByRole('textbox', { name: '文章正文' })).toHaveValue('需要保留的正文内容')
+  await expect(page.getByRole('textbox', { name: '文章正文' })).toHaveText('需要保留的正文内容')
   await page.unroute('**/api/posts')
   await page.getByRole('button', { name: '保存草稿', exact: true }).filter({ visible: true }).click()
   await expect(page).toHaveURL(/\/admin\/posts\/(?!new)[^/]+$/)

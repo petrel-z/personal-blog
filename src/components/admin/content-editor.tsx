@@ -8,9 +8,10 @@ import { api } from '@/client/api'
 import { useAuth } from '@/app/(admin)/_components'
 import type { Category, Tag, PostWithRelations } from '@/shared/types'
 import { uploadImage } from '@/lib/upload-image'
-import { AdminBadge, AdminDialog, AdminPageHeader, AdminPanel, AdminSearch, AdminState } from './ui'
+import { AdminBadge, AdminDialog, AdminPanel, AdminSearch, AdminState } from './ui'
 import './content-editor.css'
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
+const VisualEditor = dynamic(() => import('./visual-editor'), { ssr: false })
 import { editorCanWrite, editorDraftKey, readEditorDraft, writeEditorDraft, removeEditorDraft, type EditorForm as Form } from './content-editor-state'
 const draftStorage = () => window.sessionStorage
 const empty: Form = { title: '', content: '', summary: '', coverImage: '', categoryId: '', tags: [], status: 'DRAFT', isPinned: false, createdAt: '' }
@@ -32,7 +33,10 @@ export function ContentEditor({ id }: { id?: string }) {
   const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [bodyUploading, setBodyUploading] = useState(false)
+  const uploading = coverUploading || bodyUploading
+  const [source, setSource] = useState(false)
   const [preview, setPreview] = useState(false)
   const [tagDialog, setTagDialog] = useState(false)
   const [tagSearch, setTagSearch] = useState('')
@@ -42,8 +46,7 @@ export function ContentEditor({ id }: { id?: string }) {
   const [saved, setSaved] = useState(false)
   const [leaveTarget, setLeaveTarget] = useState<string | null>(null)
   const coverInput = useRef<HTMLInputElement>(null)
-  const imageInput = useRef<HTMLInputElement>(null)
-  const dirty = JSON.stringify(form) !== baseline
+  const dirty = uploading || JSON.stringify(form) !== baseline
   const editable = editorCanWrite(!!id, originalStatus, can(id ? 'post:update' : 'post:create'), can('post:publish'))
   const readOnlyReason = id && originalStatus === 'PUBLISHED' && !can('post:publish') ? '这篇文章已发布。修改已发布文章需要发布权限，当前以只读方式打开，仍可预览正文。' : '当前账号没有编辑这篇文章的权限，仍可预览正文。'
   const load = useCallback(async () => {
@@ -113,45 +116,77 @@ export function ContentEditor({ id }: { id?: string }) {
       setTags(prev => [...prev.filter(t => t.id !== tag.id), tag]); update('tags', Array.from(new Set([...form.tags, tag.name]))); setTagName('')
     } catch (e) { setTagError(e instanceof Error ? e.message : '创建失败，请重试') } finally { setTagBusy(false) }
   }
-  async function upload(file: File | undefined, cover: boolean) {
-    if (!file || uploading || !editable) return
+  async function uploadCover(file: File | undefined) {
+    if (!file || coverUploading || !editable || recovery || busy) return
     if (!file.type.startsWith('image/')) { setError('请选择图片文件。'); return }
-    setUploading(true); setError('')
+    setCoverUploading(true); setError('')
     try {
       const url = await uploadImage(file)
-      setForm(prev => cover ? { ...prev, coverImage: url } : { ...prev, content: `${prev.content}\n\n![${file.name.replace(/[\[\]]/g, '')}](${url})` }); setSaved(false)
-    } catch (e) { setError(e instanceof Error ? e.message : '图片上传失败，请重试') } finally { setUploading(false); if (coverInput.current) coverInput.current.value = ''; if (imageInput.current) imageInput.current.value = '' }
+      setForm(prev => ({ ...prev, coverImage: url })); setSaved(false)
+    } catch (e) { setError(e instanceof Error ? e.message : '图片上传失败，请重试') } finally { setCoverUploading(false); if (coverInput.current) coverInput.current.value = '' }
   }
   if (loading || authLoading) return <AdminState kind="loading" title="正在打开编辑器…" />
   if (loadError) return <AdminState kind="error" description={loadError} onRetry={load} />
-  return <div className="content-editor space-y-6">
-    <button className="admin-btn admin-btn-ghost" onClick={() => dirty ? setLeaveTarget('/admin/posts') : router.push('/admin/posts')}>← 返回文章列表</button>
-    <AdminPageHeader title={id ? '编辑文章' : '新建文章'} description={dirty ? '有未保存的修改' : saved ? '文章已保存' : '让想法成为文字。'} actions={<><AdminBadge tone={form.status === 'PUBLISHED' ? 'success' : 'warning'}>{form.status === 'PUBLISHED' ? '已发布' : form.status === 'ARCHIVED' ? '已归档' : '草稿'}</AdminBadge><button className="admin-btn admin-btn-secondary" onClick={() => setPreview(!preview)}>{preview ? '返回编辑' : '预览'}</button>{editable && <button className="admin-btn admin-btn-secondary" disabled={busy || uploading} onClick={() => save(false)}>{busy ? '保存中…' : form.status === 'DRAFT' ? '保存草稿' : '保存'}</button>}{editable && can('post:publish') && form.status !== 'PUBLISHED' && <button className="admin-btn admin-btn-primary" disabled={busy || uploading} onClick={() => save(true)}>发布文章</button>}</>} />
+  return <div className="content-editor">
+    <header className="content-editor-header">
+      <button className="content-editor-back" onClick={() => dirty ? setLeaveTarget('/admin/posts') : router.push('/admin/posts')}>← 返回文章列表</button>
+      <div className="content-editor-heading">
+        <div className="content-editor-heading-title">
+          <h1>{id ? '编辑文章' : '新建文章'}</h1>
+          <AdminBadge tone={form.status === 'PUBLISHED' ? 'success' : 'warning'}>{form.status === 'PUBLISHED' ? '已发布' : form.status === 'ARCHIVED' ? '已归档' : '草稿'}</AdminBadge>
+        </div>
+        <div className="admin-page-actions">
+          <span className="content-editor-save-state" role="status" title="未保存的修改会备份在本浏览器标签页；再次打开时可选择恢复，不会自动覆盖服务器文章。">{dirty ? '有未保存的修改' : saved ? '文章已保存' : id ? '已加载保存内容' : '尚未保存'}</span>
+          <button className="admin-btn admin-btn-secondary" disabled={bodyUploading} onClick={() => { setPreview(!preview); setSource(false) }}>{preview ? '返回编辑' : '预览'}</button>
+          {editable && <button className="admin-btn admin-btn-secondary" disabled={busy || uploading} onClick={() => save(false)}>{busy ? '保存中…' : form.status === 'DRAFT' ? '保存草稿' : '保存'}</button>}
+          {editable && can('post:publish') && form.status !== 'PUBLISHED' && <button className="admin-btn admin-btn-primary" disabled={busy || uploading} onClick={() => save(true)}>发布文章</button>}
+        </div>
+      </div>
+    </header>
     {!editable && <p className="admin-notice admin-notice-warning" role="status">{readOnlyReason}</p>}
     {storageWarning && <p className="admin-notice admin-notice-warning" role="status">{storageWarning}</p>}
-    {editable && !storageWarning && <p className="text-xs text-muted-foreground">未保存的修改会备份在本浏览器标签页；再次打开时可选择恢复，不会自动覆盖服务器文章。</p>}
     {error && <p className="admin-notice admin-notice-error" role="alert">{error}</p>}
     {uploading && <p className="admin-notice" role="status">图片上传中，请稍候…</p>}
     <fieldset disabled={!editable || busy || !!recovery} className="content-editor-layout">
-      <AdminPanel title="正文" actions={<div className="admin-tabs" role="tablist" aria-label="正文视图"><button role="tab" aria-selected={!preview} onClick={() => setPreview(false)}>编辑</button><button role="tab" aria-selected={preview} onClick={() => setPreview(true)}>预览</button></div>}>
-        <div className="content-editor-title"><label className="sr-only" htmlFor="post-title">文章标题</label><input id="post-title" maxLength={200} placeholder="请输入文章标题" value={form.title} onChange={e => update('title', e.target.value)} /></div>
-        <div data-color-mode="light" onPaste={e => { const file = Array.from(e.clipboardData.files).find(f => f.type.startsWith('image/')); if (file) { e.preventDefault(); void upload(file, false) } }} onDragOver={e => e.preventDefault()} onDrop={e => { if (e.dataTransfer.files.length) { e.preventDefault(); void upload(e.dataTransfer.files[0], false) } }}>
-          <MDEditor value={form.content} onChange={v => update('content', v || '')} height={580} preview={preview ? 'preview' : 'edit'} previewOptions={{ rehypePlugins: [rehypeSanitize] }} textareaProps={{ 'aria-label': '文章正文', placeholder: '开始写作，支持 Markdown…' }} />
-        </div><div className="content-editor-footer"><button className="admin-btn admin-btn-ghost" disabled={uploading} onClick={() => imageInput.current?.click()}>＋ 插入图片</button><span>{form.content.length} 字 · 约 {Math.max(1, Math.ceil(form.content.length / 400))} 分钟</span></div>
-        <input ref={imageInput} type="file" accept="image/*" hidden onChange={e => void upload(e.target.files?.[0], false)} />
+      <AdminPanel className="content-editor-body-panel" title="正文" actions={<div className="admin-tabs" role="tablist" aria-label="正文视图"><button role="tab" aria-selected={!preview && !source} onClick={() => { setPreview(false); setSource(false) }}>编辑</button><button role="tab" aria-selected={source && !preview} disabled={bodyUploading} onClick={() => { setSource(true); setPreview(false) }}>源码</button><button role="tab" aria-selected={preview} disabled={bodyUploading} onClick={() => setPreview(true)}>预览</button></div>}>
+        <VisualEditor
+          value={form.content}
+          disabled={!editable || busy || !!recovery || preview || source}
+          canUpload={can('upload:create')}
+          onChange={value => update('content', value)}
+          onUploadingChange={setBodyUploading}
+          onError={setError}
+          documentHeader={<div className="content-editor-title">
+            <label className="sr-only" htmlFor="post-title">文章标题</label>
+            <input id="post-title" maxLength={200} placeholder="输入文章标题…" value={form.title} onChange={e => update('title', e.target.value)} />
+            {form.summary && <p className="content-editor-subtitle">{form.summary}</p>}
+          </div>}
+          alternateView={source && !preview
+            ? <textarea className="content-editor-source" aria-label="Markdown 源码" value={form.content} onChange={event => update('content', event.target.value)} spellCheck={false} />
+            : preview ? <div className="content-editor-preview" data-color-mode="light"><MDEditor value={form.content} height={580} preview="preview" hideToolbar previewOptions={{ rehypePlugins: [rehypeSanitize] }} /></div> : undefined}
+        />
+        <div className="content-editor-footer"><span>{source ? 'Markdown 源码' : preview ? '文章预览' : '支持 Markdown · 可粘贴或拖入图片'}</span><span>{form.content.length} 字 · 约 {Math.max(1, Math.ceil(form.content.length / 400))} 分钟</span></div>
       </AdminPanel>
-      <AdminPanel title="文章设置"><div className="content-editor-settings admin-form">
-        <div className="admin-field"><span>封面图片</span><button type="button" className="content-cover" disabled={uploading} onClick={() => coverInput.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void upload(e.dataTransfer.files[0], true) }}>{form.coverImage ? <Image src={form.coverImage} alt="文章封面" width={640} height={360} unoptimized /> : <><span>＋ 上传封面图片</span><small>建议 16:9 · JPG / PNG / WebP</small></>}</button><input ref={coverInput} type="file" accept="image/*" hidden onChange={e => void upload(e.target.files?.[0], true)} />{form.coverImage && <button className="admin-btn admin-btn-ghost" onClick={() => update('coverImage', '')}>移除封面</button>}</div>
-        <label className="admin-field">封面地址<input type="url" placeholder="https://…" value={form.coverImage} onChange={e => update('coverImage', e.target.value)} /></label>
+      <AdminPanel className="content-editor-settings-panel" title="文章设置"><div className="content-editor-settings admin-form">
+        <div className="admin-field"><span>封面图片</span><button type="button" className="content-cover" disabled={uploading} onClick={() => coverInput.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void uploadCover(e.dataTransfer.files[0]) }}>{form.coverImage ? <Image src={form.coverImage} alt="文章封面" width={640} height={360} unoptimized /> : <><span>＋ 上传封面图片</span><small>建议 16:9 · JPG / PNG / WebP</small></>}</button><input ref={coverInput} type="file" accept="image/*" hidden onChange={e => void uploadCover(e.target.files?.[0])} />{form.coverImage && <button className="admin-btn admin-btn-ghost" onClick={() => update('coverImage', '')}>移除封面</button>}</div>
         <label className="admin-field">文章分类<select value={form.categoryId} onChange={e => update('categoryId', e.target.value)}><option value="">未分类</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <div className="admin-field"><span>文章标签</span><div className="content-tag-list">{form.tags.map(t => <button className="content-tag" key={t} aria-label={`移除标签 ${t}`} onClick={() => toggleTag(t)}>{t} ×</button>)}<button className="admin-btn admin-btn-ghost" onClick={() => { setTagDialog(true); setTagError('') }}>＋ 添加</button></div></div>
-        <label className="admin-field">文章摘要<textarea rows={4} maxLength={500} value={form.summary} placeholder="用几句话介绍这篇文章…" onChange={e => update('summary', e.target.value)} /><small>{form.summary.length} / 500</small></label>
-        <label className="content-pin"><span>置顶文章</span><input type="checkbox" checked={form.isPinned} onChange={e => update('isPinned', e.target.checked)} /></label>
-        {id && <label className="admin-field">文章状态<select value={form.status} onChange={e => update('status', e.target.value as Form['status'])}><option value="DRAFT">草稿</option>{(can('post:publish') || form.status === 'PUBLISHED') && <option value="PUBLISHED">已发布</option>}<option value="ARCHIVED">归档</option></select></label>}
-        <label className="admin-field">创建时间<input type="datetime-local" value={form.createdAt} onChange={e => update('createdAt', e.target.value)} /><small>留空使用默认时间。</small></label>
+        <label className="admin-field content-editor-summary">文章摘要<textarea rows={3} maxLength={500} value={form.summary} placeholder="用几句话介绍这篇文章…" onChange={e => update('summary', e.target.value)} /><small>{form.summary.length} / 500</small></label>
+        <label className="content-pin"><span>置顶文章</span><input className="content-editor-switch" type="checkbox" checked={form.isPinned} onChange={e => update('isPinned', e.target.checked)} /></label>
+        <div className="content-editor-settings-footer">
+          <div className="content-editor-created"><span>创建时间</span><span>{form.createdAt ? form.createdAt.replace('T', ' ') : '保存时自动生成'}</span></div>
+          <details className="content-editor-advanced">
+            <summary>更多设置</summary>
+            <div className="admin-form">
+              <label className="admin-field">封面地址<input type="url" placeholder="https://…" value={form.coverImage} onChange={e => update('coverImage', e.target.value)} /></label>
+              {id && <label className="admin-field">文章状态<select value={form.status} onChange={e => update('status', e.target.value as Form['status'])}><option value="DRAFT">草稿</option>{(can('post:publish') || form.status === 'PUBLISHED') && <option value="PUBLISHED">已发布</option>}<option value="ARCHIVED">归档</option></select></label>}
+              <label className="admin-field">创建时间<input type="datetime-local" value={form.createdAt} onChange={e => update('createdAt', e.target.value)} /><small>留空使用默认时间。</small></label>
+            </div>
+          </details>
+        </div>
       </div></AdminPanel>
     </fieldset>
-    <div className="content-editor-mobile-actions"><button className="admin-btn admin-btn-secondary" onClick={() => setPreview(!preview)}>{preview ? '编辑' : '预览'}</button>{editable && <button className="admin-btn admin-btn-secondary" disabled={busy || uploading} onClick={() => save(false)}>{busy ? '保存中…' : form.status === 'DRAFT' ? '保存草稿' : '保存'}</button>}{editable && can('post:publish') && form.status !== 'PUBLISHED' && <button className="admin-btn admin-btn-primary" disabled={busy || uploading} onClick={() => save(true)}>发布文章</button>}</div>
+    <div className="content-editor-mobile-actions"><button className="admin-btn admin-btn-secondary" disabled={bodyUploading} onClick={() => { setPreview(!preview); setSource(false) }}>{preview ? '编辑' : '预览'}</button>{editable && <button className="admin-btn admin-btn-secondary" disabled={busy || uploading} onClick={() => save(false)}>{busy ? '保存中…' : form.status === 'DRAFT' ? '保存草稿' : '保存'}</button>}{editable && can('post:publish') && form.status !== 'PUBLISHED' && <button className="admin-btn admin-btn-primary" disabled={busy || uploading} onClick={() => save(true)}>发布文章</button>}</div>
     <AdminDialog open={!!recovery} onClose={() => {}} title="发现未保存的草稿" description="本标签页保存了此账号对此文章的未保存修改。恢复只会填入编辑器，点击保存后才会更新服务器。" busy><div className="admin-dialog-footer"><button className="admin-btn admin-btn-secondary" onClick={() => { clearBackup(); setRecovery(null) }}>放弃备份，使用服务器内容</button><button className="admin-btn admin-btn-primary" disabled={!editable} onClick={() => { if (recovery && editable) { setForm(recovery); setSaved(false); setRecovery(null) } }}>恢复草稿</button></div>{!editable && <p className="admin-notice">{readOnlyReason}</p>}</AdminDialog>
     <AdminDialog open={tagDialog} onClose={() => setTagDialog(false)} title="选择文章标签" description="可选择多个标签，也可以创建新标签。" busy={tagBusy}><div className="admin-form"><AdminSearch value={tagSearch} onChange={setTagSearch} placeholder="搜索标签…" /><div className="content-tag-options">{tags.filter(t => t.name.toLowerCase().includes(tagSearch.toLowerCase())).map(t => <label key={t.id}><input type="checkbox" checked={form.tags.includes(t.name)} onChange={() => toggleTag(t.name)} />{t.name}</label>)}{!tags.some(t => t.name.toLowerCase().includes(tagSearch.toLowerCase())) && <p>没有匹配的标签</p>}</div>{tagError && <p role="alert" className="admin-notice admin-notice-error">{tagError}</p>}{can('tag:manage') && <><label className="admin-field">创建新标签<input maxLength={20} value={tagName} onChange={e => setTagName(e.target.value)} placeholder="输入标签名称" /></label><button className="admin-btn admin-btn-secondary" disabled={tagBusy || !tagName.trim()} onClick={createTag}>{tagBusy ? '创建中…' : '创建并选中'}</button></>}<div className="admin-dialog-footer"><button className="admin-btn admin-btn-primary" disabled={tagBusy} onClick={() => setTagDialog(false)}>完成 · 已选 {form.tags.length} 个</button></div></div></AdminDialog>
     <AdminDialog open={!!leaveTarget} onClose={() => setLeaveTarget(null)} title="离开编辑器？" description="当前修改尚未保存。离开后，这些修改将丢失。"><div className="admin-dialog-footer"><button className="admin-btn admin-btn-secondary" onClick={() => setLeaveTarget(null)}>继续编辑</button><button className="admin-btn admin-btn-danger" onClick={() => { const target = leaveTarget!; discardBackup.current = true; clearBackup(); setBaseline(JSON.stringify(form)); setLeaveTarget(null); router.push(target) }}>放弃修改并离开</button></div></AdminDialog>
