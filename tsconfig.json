@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -18,15 +22,37 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@/auth": ["./auth"],
-      "@/auth.ts": ["./auth.ts"],
-      "@/components/*": ["./src/components/*"],
-      "@/server/*": ["./src/server/*"],
-      "@/client/*": ["./src/client/*"],
-      "@/shared/*": ["./src/shared/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@/auth": [
+        "./auth"
+      ],
+      "@/auth.ts": [
+        "./auth.ts"
+      ],
+      "@/components/*": [
+        "./src/components/*"
+      ],
+      "@/server/*": [
+        "./src/server/*"
+      ],
+      "@/client/*": [
+        "./src/client/*"
+      ],
+      "@/shared/*": [
+        "./src/shared/*"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "src/types/**/*.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

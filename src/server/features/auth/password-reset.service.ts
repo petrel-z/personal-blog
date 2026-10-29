@@ -15,8 +15,8 @@ export { confirmPasswordReset } from './password-reset-confirm.service'
 
 const requestSchema = z.object({
   email: z.string().trim().email().max(254).transform(normalizeEmail),
-  captchaId: z.string().min(1).max(64),
-  captchaCode: z.string().regex(/^[a-z0-9]{4}$/i),
+  // captchaId: z.string().min(1).max(64),
+  // captchaCode: z.string().regex(/^[a-z0-9]{4}$/i),
   ip: resetIpSchema,
 })
 
@@ -26,10 +26,10 @@ const lifetimeMs = 10 * 60_000
 export async function requestPasswordReset(input: unknown, deps: { mail?: MailTransport } = {}) {
   const parsed = requestSchema.safeParse(input)
   if (!parsed.success) throw new PasswordResetError('invalid')
-  const { email, captchaId, captchaCode, ip } = parsed.data
-  if (!await consumeCaptcha({ id: captchaId, code: captchaCode, purpose: 'password-reset' })) {
-    throw new PasswordResetError('captcha')
-  }
+  const { email, ip } = parsed.data
+  // if (!await consumeCaptcha({ id: captchaId, code: captchaCode, purpose: 'password-reset' })) {
+  //   throw new PasswordResetError('captcha')
+  // }
   const secret = readResetCodeSecret()
   const key = emailKey(email)
   // Charge valid attempts (including cooldown retries) equally for all addresses.

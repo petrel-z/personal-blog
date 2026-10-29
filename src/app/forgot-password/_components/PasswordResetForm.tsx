@@ -6,6 +6,7 @@ import { Eye, EyeOff, Check } from 'lucide-react'
 import { useCaptcha } from '@/client/hooks/useCaptcha'
 import { CaptchaInput } from '@/app/(admin)/_components/CaptchaInput'
 import { resetPasswordFormSchema, resetRequestFormSchema } from '@/shared/validations'
+import { useTencentCaptcha } from '../../../client/hooks/useTencentCaptcha'
 
 const inputClass = 'w-full min-w-0'
 const buttonClass = 'admin-btn admin-btn-primary auth-submit'
@@ -78,23 +79,40 @@ export function PasswordResetForm() {
   const sendingCooldown = useCooldown('password-reset:send-until')
   const checkingCooldown = useCooldown('password-reset:confirm-until')
 
+  const tencentCaptcha = useTencentCaptcha()
+
   useEffect(() => { if (step === 'confirm') codeInput.current?.focus() }, [step])
 
   async function send(event: FormEvent) {
     event.preventDefault()
     if (inFlight.current || !sendingCooldown.ready || sendingCooldown.seconds > 0) return
-    const parsed = resetRequestFormSchema.safeParse({ email, captcha: captcha.value })
+    // const parsed = resetRequestFormSchema.safeParse({ email, captcha: captcha.value })
+    // const parsed = resetRequestFormSchema.safeParse({ email })
+    const parsed = resetRequestFormSchema.shape.email.safeParse(email)
+
     if (!parsed.success) { setError(parsed.error.issues[0].message); return }
-    if (!captcha.id || captcha.loading) { setError('请刷新图片验证码后重试'); return }
+    // if (!captcha.id || captcha.loading) { setError('请刷新图片验证码后重试'); return }
     inFlight.current = true
     setBusy('send')
     setError('')
     try {
-      const result = await submitReset('request', { email: parsed.data.email, captchaId: captcha.id, captchaCode: parsed.data.captcha })
-      if (result.ok || result.limited) sendingCooldown.start(result.retryAfter)
-      if (!result.ok) { setError(result.message); return }
-      setEmail(parsed.data.email)
-      setNotice(result.message)
+      console.log('Opening Tencent Captcha')
+      const res = await tencentCaptcha.openCaptcha()
+      const re = await fetch('/api/auth/password-reset/tencent-captcha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: res.ticket, randstr: res.randstr }),
+      })
+      const data = await re.json()
+      if (!data || data.code !== 2000) {
+        setError('人机验证失败，请刷新页面后重试')
+        return
+      }
+      const result = await submitReset('request', { email: email })
+      // if (result.ok || result.limited) sendingCooldown.start(result.retryAfter)
+      // if (!result.ok) { setError(result.message); return }
+      setEmail(email)
+      setNotice(data.message)
       setCode('')
       setResending(false)
       setStep('confirm')
@@ -154,10 +172,10 @@ export function PasswordResetForm() {
             <input id="recovery-email" type="email" autoComplete="email" maxLength={254} required
               value={email} onChange={event => setEmail(event.target.value)} placeholder="请输入注册时使用的邮箱" className={inputClass} />
           </div>
-          <div className="admin-field">
+          {/* <div className="admin-field">
             <label htmlFor="captcha" className="auth-recovery-label">图片验证码</label>
             <CaptchaInput captcha={captcha} />
-          </div>
+          </div> */}
           <button type="submit" className={buttonClass} disabled={!!busy || !sendingCooldown.ready || sendingCooldown.seconds > 0 || captcha.loading || !captcha.id}>
             {busy === 'send' ? '发送中…' : sendingCooldown.seconds > 0 ? `${sendingCooldown.seconds} 秒后可发送` : '发送邮件验证码'}
           </button>
