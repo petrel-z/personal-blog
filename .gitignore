@@ -52,6 +52,7 @@ coverage
 .archify
 
 # doc
+/doc/
 doc
 doc/design
 doc/dev
@@ -61,3 +62,7 @@ doc/dev
 
 # Isolated UI verification builds
 /.next-ui-*/
+
+# Image upload data
+/.data/image-uploads/
+/public/uploads/
