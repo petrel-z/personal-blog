@@ -331,3 +331,41 @@ model PostLike {
   @@index([postId])
   @@index([deletedAt])
 }
+
+// Resumable image uploads; bytes live in private local storage or OSS multipart.
+model ImageUploadTask {
+  id             String   @id @db.Char(36)
+  userId         String
+  fileHash       String   @db.Char(64)
+  fileSize       Int
+  fileType       String   @db.VarChar(32)
+  partSize       Int
+  totalParts     Int
+  partHashes     Json
+  provider       String   @db.VarChar(16)
+  objectKey      String   @db.VarChar(191)
+  remoteUploadId String?  @db.VarChar(191)
+  status         String   @default("UPLOADING") @db.VarChar(16)
+  url            String?  @db.Text
+  completeToken  String?  @db.Char(36)
+  leaseUntil     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  parts          ImageUploadPart[]
+
+  @@index([userId, fileHash, provider])
+  @@index([status, expiresAt])
+}
+
+model ImageUploadPart {
+  uploadId   String   @db.Char(36)
+  partNumber Int
+  size       Int
+  hash       String   @db.Char(64)
+  etag       String   @db.VarChar(191)
+  createdAt  DateTime @default(now())
+  task       ImageUploadTask @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@id([uploadId, partNumber])
+}

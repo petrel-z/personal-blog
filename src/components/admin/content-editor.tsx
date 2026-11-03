@@ -8,6 +8,7 @@ import { api } from '@/client/api'
 import { useAuth } from '@/app/(admin)/_components'
 import type { Category, Tag, PostWithRelations } from '@/shared/types'
 import { uploadImage } from '@/lib/upload-image'
+import { imageUploadError, uploadProgressLabel, type UploadProgress } from '@/shared/image-upload'
 import { AdminBadge, AdminDialog, AdminPanel, AdminSearch, AdminState } from './ui'
 import './content-editor.css'
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
@@ -34,6 +35,9 @@ export function ContentEditor({ id }: { id?: string }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [coverUploading, setCoverUploading] = useState(false)
+  const [coverProgress, setCoverProgress] = useState<UploadProgress | null>(null)
+  const coverController = useRef<AbortController | null>(null)
+  useEffect(() => () => coverController.current?.abort(), [])
   const [bodyUploading, setBodyUploading] = useState(false)
   const uploading = coverUploading || bodyUploading
   const [source, setSource] = useState(false)
@@ -118,12 +122,16 @@ export function ContentEditor({ id }: { id?: string }) {
   }
   async function uploadCover(file: File | undefined) {
     if (!file || coverUploading || !editable || recovery || busy) return
-    if (!file.type.startsWith('image/')) { setError('请选择图片文件。'); return }
-    setCoverUploading(true); setError('')
+    const validation = imageUploadError(file)
+    if (validation) { setError(validation); return }
+    const controller = new AbortController()
+    coverController.current = controller
+    setCoverUploading(true); setCoverProgress(null); setError('')
     try {
-      const url = await uploadImage(file)
+      const url = await uploadImage(file, controller.signal, setCoverProgress)
       setForm(prev => ({ ...prev, coverImage: url })); setSaved(false)
-    } catch (e) { setError(e instanceof Error ? e.message : '图片上传失败，请重试') } finally { setCoverUploading(false); if (coverInput.current) coverInput.current.value = '' }
+    } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? `${e.message}；重新选择同一图片可继续上传。` : '图片上传失败，请重试') }
+    finally { coverController.current = null; setCoverUploading(false); setCoverProgress(null); if (coverInput.current) coverInput.current.value = '' }
   }
   if (loading || authLoading) return <AdminState kind="loading" title="正在打开编辑器…" />
   if (loadError) return <AdminState kind="error" description={loadError} onRetry={load} />
@@ -146,7 +154,9 @@ export function ContentEditor({ id }: { id?: string }) {
     {!editable && <p className="admin-notice admin-notice-warning" role="status">{readOnlyReason}</p>}
     {storageWarning && <p className="admin-notice admin-notice-warning" role="status">{storageWarning}</p>}
     {error && <p className="admin-notice admin-notice-error" role="alert">{error}</p>}
-    {uploading && <p className="admin-notice" role="status">图片上传中，请稍候…</p>}
+    {uploading && <div className="admin-notice" role="status">{coverUploading && coverProgress ? uploadProgressLabel(coverProgress) : '图片上传中，请稍候…'}
+      {coverUploading && <button type="button" className="admin-btn admin-btn-secondary" onClick={() => coverController.current?.abort()}>取消上传</button>}
+    </div>}
     <fieldset disabled={!editable || busy || !!recovery} className="content-editor-layout">
       <AdminPanel className="content-editor-body-panel" title="正文" actions={<div className="admin-tabs" role="tablist" aria-label="正文视图"><button role="tab" aria-selected={!preview && !source} onClick={() => { setPreview(false); setSource(false) }}>编辑</button><button role="tab" aria-selected={source && !preview} disabled={bodyUploading} onClick={() => { setSource(true); setPreview(false) }}>源码</button><button role="tab" aria-selected={preview} disabled={bodyUploading} onClick={() => setPreview(true)}>预览</button></div>}>
         <VisualEditor
@@ -168,7 +178,7 @@ export function ContentEditor({ id }: { id?: string }) {
         <div className="content-editor-footer"><span>{source ? 'Markdown 源码' : preview ? '文章预览' : '支持 Markdown · 可粘贴或拖入图片'}</span><span>{form.content.length} 字 · 约 {Math.max(1, Math.ceil(form.content.length / 400))} 分钟</span></div>
       </AdminPanel>
       <AdminPanel className="content-editor-settings-panel" title="文章设置"><div className="content-editor-settings admin-form">
-        <div className="admin-field"><span>封面图片</span><button type="button" className="content-cover" disabled={uploading} onClick={() => coverInput.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void uploadCover(e.dataTransfer.files[0]) }}>{form.coverImage ? <Image src={form.coverImage} alt="文章封面" width={640} height={360} unoptimized /> : <><span>＋ 上传封面图片</span><small>建议 16:9 · JPG / PNG / WebP</small></>}</button><input ref={coverInput} type="file" accept="image/*" hidden onChange={e => void uploadCover(e.target.files?.[0])} />{form.coverImage && <button className="admin-btn admin-btn-ghost" onClick={() => update('coverImage', '')}>移除封面</button>}</div>
+        <div className="admin-field"><span>封面图片</span><button type="button" className="content-cover" disabled={uploading} onClick={() => coverInput.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void uploadCover(e.dataTransfer.files[0]) }}>{form.coverImage ? <Image src={form.coverImage} alt="文章封面" width={640} height={360} unoptimized /> : <><span>＋ 上传封面图片</span><small>建议 16:9 · JPG / PNG / WebP</small></>}</button><input ref={coverInput} aria-label="选择封面图片" type="file" accept="image/*" hidden onChange={e => void uploadCover(e.target.files?.[0])} />{form.coverImage && <button className="admin-btn admin-btn-ghost" onClick={() => update('coverImage', '')}>移除封面</button>}</div>
         <label className="admin-field">文章分类<select value={form.categoryId} onChange={e => update('categoryId', e.target.value)}><option value="">未分类</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <div className="admin-field"><span>文章标签</span><div className="content-tag-list">{form.tags.map(t => <button className="content-tag" key={t} aria-label={`移除标签 ${t}`} onClick={() => toggleTag(t)}>{t} ×</button>)}<button className="admin-btn admin-btn-ghost" onClick={() => { setTagDialog(true); setTagError('') }}>＋ 添加</button></div></div>
         <label className="admin-field content-editor-summary">文章摘要<textarea rows={3} maxLength={500} value={form.summary} placeholder="用几句话介绍这篇文章…" onChange={e => update('summary', e.target.value)} /><small>{form.summary.length} / 500</small></label>

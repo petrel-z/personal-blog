@@ -2,6 +2,7 @@ import { closeHistory } from '@milkdown/kit/prose/history'
 import { Plugin, PluginKey } from '@milkdown/kit/prose/state'
 import { Decoration, DecorationSet, type EditorView } from '@milkdown/kit/prose/view'
 import { uploadImage } from '@/lib/upload-image'
+import { imageUploadError, isMultipartImage, uploadProgressLabel } from '@/shared/image-upload'
 
 export function clipboardImages(data: Pick<DataTransfer, 'items' | 'files'>): File[] {
   const items = Array.from(data.items || [])
@@ -11,13 +12,11 @@ export function clipboardImages(data: Pick<DataTransfer, 'items' | 'files'>): Fi
 }
 
 export function imageValidationError(file: Pick<File, 'type' | 'size'>): string | null {
-  if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) return '仅支持 JPG、PNG、GIF、WebP 图片。'
-  if (file.size > 5 * 1024 * 1024) return '图片大小不能超过 5MB。'
-  return null
+  return imageUploadError(file)
 }
 
 const uploadKey = new PluginKey<DecorationSet>('article-image-uploads')
-type PendingImage = { id: number; files: File[]; urls: string[]; controllers: AbortController[]; from: number; to: number; selectedContent: unknown }
+type PendingImage = { id: number; files: File[]; urls: string[]; labels: HTMLSpanElement[]; controllers: AbortController[]; from: number; to: number; selectedContent: unknown }
 type UploadOptions = {
   allowed: () => boolean
   onPending: (pending: boolean) => void
@@ -128,6 +127,7 @@ export function createImageUploads(options: UploadOptions) {
     const item = {
       id: nextId++, files: valid,
       urls: valid.map(file => URL.createObjectURL(file)),
+      labels: [] as HTMLSpanElement[],
       controllers: valid.map(() => new AbortController()),
       from: selectionFrom,
       to: selectionTo,
@@ -143,16 +143,18 @@ export function createImageUploads(options: UploadOptions) {
         image.src = item.urls[index]
         image.alt = file.name
         wrapper.append(image)
+        const label = document.createElement('span')
+        label.textContent = '图片上传中…'
+        label.setAttribute('role', 'status')
+        item.labels[index] = label
+        wrapper.append(label)
       })
-      const label = document.createElement('span')
-      label.textContent = '图片上传中…'
-      label.setAttribute('role', 'status')
       const remove = document.createElement('button')
       remove.type = 'button'
       remove.textContent = '取消上传'
       remove.setAttribute('data-remove-upload', String(item.id))
       remove.setAttribute('aria-label', '取消上传图片')
-      wrapper.append(label, remove)
+      wrapper.append(remove)
       return wrapper
     }, { id: item.id, side: item.id, key: `upload-${item.id}` })
     view.dispatch(transaction.setMeta(uploadKey, { add: [decoration] }).setMeta('addToHistory', false))
@@ -160,7 +162,9 @@ export function createImageUploads(options: UploadOptions) {
     queue = queue.then(async () => {
       if (disposed || !pending.has(item.id)) return
       try {
-        const results = await Promise.all(item.files.map((file, index) => uploadImage(file, item.controllers[index].signal)))
+        const results = await Promise.all(item.files.map((file, index) => uploadImage(file, item.controllers[index].signal, progress => {
+          if (!disposed && pending.has(item.id) && item.labels[index]) item.labels[index].textContent = uploadProgressLabel(progress)
+        })))
         if (disposed || view.isDestroyed || !pending.has(item.id)) return
         const placeholder = uploadKey.getState(view.state)?.find(undefined, undefined, spec => spec.id === item.id)[0]
         if (!placeholder) return
@@ -175,7 +179,10 @@ export function createImageUploads(options: UploadOptions) {
         tr.setMeta(uploadKey, { remove: item.id })
         view.dispatch(tr)
       } catch (error) {
-        if (!disposed && item.controllers.some(controller => !controller.signal.aborted)) options.onError(error instanceof Error ? error.message : '图片上传失败，请重试。')
+        if (!disposed && item.controllers.some(controller => !controller.signal.aborted)) {
+          const message = error instanceof Error ? error.message : '图片上传失败，请重试。'
+          options.onError(item.files.some(file => isMultipartImage(file.size)) ? `${message}；重新选择或粘贴同一图片可继续上传。` : message)
+        }
       } finally {
         if (!disposed && !view.isDestroyed) view.dispatch(view.state.tr.setMeta(uploadKey, { remove: item.id }).setMeta('addToHistory', false))
         release(item.id)

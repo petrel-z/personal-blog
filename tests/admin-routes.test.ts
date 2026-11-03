@@ -37,6 +37,10 @@ const routes = [
   ['auth/users/route', 'GET'],
   ['audit-logs/route', 'GET'],
   ['upload/route', 'POST'],
+  ['upload/multipart/route', 'POST'],
+  ['upload/multipart/[id]/route', 'GET'],
+  ['upload/multipart/[id]/parts/[number]/route', 'PUT'],
+  ['upload/multipart/[id]/complete/route', 'POST'],
 ] as const
 
 beforeEach(() => {
