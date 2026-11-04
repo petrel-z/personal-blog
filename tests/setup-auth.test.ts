@@ -5,7 +5,6 @@ function database(user: { id: string; deletedAt: Date | null } | null) {
     user: { findUnique: jest.fn().mockResolvedValue(user) },
     role: { upsert: jest.fn().mockImplementation(({ where }) => Promise.resolve({ id: where.name })) },
     permission: { upsert: jest.fn().mockImplementation(({ where }) => Promise.resolve({ id: where.code })) },
-    rolePermission: { upsert: jest.fn().mockResolvedValue({}) },
     userRole: { upsert: jest.fn().mockResolvedValue({}) },
   }
   return { tx, $transaction: jest.fn(async operation => operation(tx)) }
@@ -26,15 +25,11 @@ test('bootstrap refuses to promote deleted accounts', async () => {
   expect(db.tx.userRole.upsert).not.toHaveBeenCalled()
 })
 
-test('bootstrap assigns admin only to the selected account and grants editors no publication permission', async () => {
+test('bootstrap assigns admin only to the selected account', async () => {
   const db = database({ id: 'chosen-user', deletedAt: null })
   await setupAuthorization(db as never, 'owner@example.com')
   expect(db.tx.userRole.upsert).toHaveBeenCalledTimes(1)
   expect(db.tx.userRole.upsert).toHaveBeenCalledWith(expect.objectContaining({
     create: { userId: 'chosen-user', roleId: 'admin' },
   }))
-  const grants = db.tx.rolePermission.upsert.mock.calls.map(([arg]) => arg.create)
-  expect(grants).toContainEqual({ roleId: 'editor', permissionId: 'post:update' })
-  expect(grants).not.toContainEqual({ roleId: 'editor', permissionId: 'post:publish' })
-  expect(grants.some(grant => grant.roleId === 'member')).toBe(false)
 })

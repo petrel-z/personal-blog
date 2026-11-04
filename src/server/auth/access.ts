@@ -1,6 +1,8 @@
 import { auth } from '@/auth'
 import { prisma } from '@/server/db'
 import { PERMISSIONS, type Permission } from '@/shared/permissions'
+import { getEffectiveRolePermissions } from '@/shared/roles'
+import { isValidSessionVersion } from '@/server/features/auth/session-version.service'
 
 export interface Actor {
   id: string
@@ -18,13 +20,14 @@ export class AccessError extends Error {
 /** Read current grants; a JWT establishes identity, never current authorization. */
 export async function getActor(): Promise<Actor | null> {
   const session = await auth()
-  if (!session?.user?.id) return null
+  if (!session?.user?.id || !isValidSessionVersion(session.user.sessionVersion)) return null
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
       deletedAt: true,
+      sessionVersion: true,
       userRoles: {
         select: { role: { select: {
           name: true,
@@ -33,15 +36,15 @@ export async function getActor(): Promise<Actor | null> {
       },
     },
   })
-  if (!user || user.deletedAt) return null
+  if (!user || user.deletedAt || user.sessionVersion !== session.user.sessionVersion) return null
 
   const isAdmin = user.userRoles.some(({ role }) => role.name === 'admin')
   const granted = new Set(user.userRoles.flatMap(({ role }) =>
-    role.rolePermissions.map(({ permission }) => permission.code)))
+    getEffectiveRolePermissions(role.name, role.rolePermissions.map(({ permission }) => permission.code))))
   return {
     id: user.id,
     isAdmin,
-    permissions: isAdmin ? [...PERMISSIONS] : PERMISSIONS.filter(code => granted.has(code)),
+    permissions: PERMISSIONS.filter(code => granted.has(code)),
   }
 }
 
@@ -57,6 +60,12 @@ export async function requirePermission(permission: Permission | readonly Permis
   if (!required.some(code => actor.permissions.includes(code))) {
     throw new AccessError(403, '权限不足，无法执行此操作')
   }
+  return actor
+}
+
+export async function requireAdminPermission(permission: Permission): Promise<Actor> {
+  const actor = await requirePermission(permission)
+  if (!actor.isAdmin) throw new AccessError(403, '仅管理员可执行此操作')
   return actor
 }
 

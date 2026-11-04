@@ -10,6 +10,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Short-lived, purpose-bound challenges. Plaintext codes are never persisted.
+model CaptchaChallenge {
+  id        String   @id
+  purpose   String
+  codeHash  String   @db.Char(64)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  key         String    @id @db.VarChar(191)
+  failures    Int       @default(0)
+  lockedUntil DateTime?
+}
+
+model AuthRateBucket {
+  key         String   @id @db.VarChar(191)
+  count       Int      @default(0)
+  windowStart DateTime
+
+  @@index([windowStart])
+}
+
+enum ResetDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// One current challenge per normalized email; unknown addresses use the same cooldown.
+model PasswordResetChallenge {
+  emailKey       String              @id @db.Char(64)
+  challengeId    String              @db.Char(36)
+  userId         String?
+  codeHash       String?             @db.Char(64)
+  expiresAt      DateTime
+  sentAt         DateTime
+  failedAttempts Int                 @default(0)
+  consumedAt     DateTime?
+  deliveryStatus ResetDeliveryStatus @default(PENDING)
+
+  @@index([expiresAt])
+}
+
 // ============================================
 // RBAC Permission Model
 // ============================================
@@ -19,6 +64,7 @@ model User {
   name      String?
   email     String   @unique
   password  String
+  sessionVersion Int @default(0)
   image     String?
   deletedAt DateTime?
 
@@ -284,4 +330,42 @@ model PostLike {
   @@index([ip])
   @@index([postId])
   @@index([deletedAt])
+}
+
+// Resumable image uploads; bytes live in private local storage or OSS multipart.
+model ImageUploadTask {
+  id             String   @id @db.Char(36)
+  userId         String
+  fileHash       String   @db.Char(64)
+  fileSize       Int
+  fileType       String   @db.VarChar(32)
+  partSize       Int
+  totalParts     Int
+  partHashes     Json
+  provider       String   @db.VarChar(16)
+  objectKey      String   @db.VarChar(191)
+  remoteUploadId String?  @db.VarChar(191)
+  status         String   @default("UPLOADING") @db.VarChar(16)
+  url            String?  @db.Text
+  completeToken  String?  @db.Char(36)
+  leaseUntil     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  parts          ImageUploadPart[]
+
+  @@index([userId, fileHash, provider])
+  @@index([status, expiresAt])
+}
+
+model ImageUploadPart {
+  uploadId   String   @db.Char(36)
+  partNumber Int
+  size       Int
+  hash       String   @db.Char(64)
+  etag       String   @db.VarChar(191)
+  createdAt  DateTime @default(now())
+  task       ImageUploadTask @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@id([uploadId, partNumber])
 }

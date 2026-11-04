@@ -57,9 +57,13 @@ export function CommentSection({ postId }: CommentSectionProps) {
   }
 
   const fetchCaptcha = async () => {
+    setCaptcha('')
+    setCaptchaId('')
+    setCaptchaImage('')
     try {
-      const response = await fetch('/api/captcha?' + Date.now())
+      const response = await fetch('/api/captcha?purpose=comment&t=' + Date.now())
       const captchaId = response.headers.get('X-Captcha-Id') || ''
+      if (!response.ok || !captchaId) throw new Error('验证码加载失败')
       const svg = await response.text()
       setCaptchaId(captchaId)
       // 使用 encodeURIComponent 处理 SVG，避免 btoa 中文问题
@@ -80,7 +84,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
       const result = await api.post('/comments', {
         nickname: nickname.trim(),
         content: content.trim(),
-        captcha: captcha.trim(),
+        captchaCode: captcha.trim(),
         captchaId,
         postId,
       }) as { code: number; message: string }
@@ -90,13 +94,13 @@ export function CommentSection({ postId }: CommentSectionProps) {
         setNickname('')
         setContent('')
         setCaptcha('')
-        fetchCaptcha()
       } else {
         setSubmitMessage({ type: 'error', text: result.message || '评论提交失败' })
       }
     } catch (error: any) {
       setSubmitMessage({ type: 'error', text: error?.message || '评论提交失败' })
     } finally {
+      await fetchCaptcha()
       setIsSubmitting(false)
     }
   }
@@ -179,7 +183,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
           </p>
           <button
             type="submit"
-            disabled={isSubmitting || !nickname.trim() || !content.trim() || !captcha.trim()}
+            disabled={isSubmitting || !captchaId || !nickname.trim() || !content.trim() || !captcha.trim()}
             className={cn(
               'flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 active:scale-95',
               isSubmitting || !nickname.trim() || !content.trim() || !captcha.trim()

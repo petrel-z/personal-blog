@@ -1,361 +1,75 @@
 'use client'
-
-import React, { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { api } from '@/client/api'
-import { PermissionGate } from '../../_components/PermissionGate'
 import { useAuth } from '../../_components'
-import type { CommentWithReplies, PostWithRelations } from '@/shared/types'
-
-interface AdminComment extends CommentWithReplies {
-  email?: string
-  post?: {
-    id: string
-    title: string
-    slug: string
-  }
-  ip?: string
-  userAgent?: string
-}
-
+import type { CommentWithReplies } from '@/shared/types'
+import { AdminBadge, AdminDialog, AdminPageHeader, AdminPagination, AdminPanel, AdminSearch, AdminState } from '@/components/admin/ui'
+interface AdminComment extends CommentWithReplies { email?: string; post?: { id: string; title: string; slug: string }; ip?: string }
+const labels = { all: '全部评论', PENDING: '待审核', APPROVED: '已通过', REJECTED: '已拒绝' }
+type Action = 'approve' | 'reject' | 'delete'
 export default function CommentsPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, can } = useAuth()
   const [comments, setComments] = useState<AdminComment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [success, setSuccess] = useState('')
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [filter, setFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all')
-  const [selectedComments, setSelectedComments] = useState<Set<string>>(new Set())
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) return
-    fetchComments()
-  }, [isAuthenticated, authLoading, page, filter])
-
-  const fetchComments = async () => {
+  const [filter, setFilter] = useState<keyof typeof labels>('all')
+  const [search, setSearch] = useState('')
+  const [total, setTotal] = useState(0)
+  const [pages, setPages] = useState(1)
+  const requestId = useRef(0)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const [deleting, setDeleting] = useState<string[]>([])
+  const selectAllRef = useRef<HTMLInputElement>(null)
+  const load = useCallback(async () => {
+    const request = ++requestId.current
+    setLoading(true); setLoadError('')
     try {
-      setIsLoading(true)
-      const params: Record<string, string | number> = { page, pageSize: 20 }
-      if (filter !== 'all') {
-        params.status = filter
-      }
-
-      const result = await api.get('/comments/admin', params) as { code: number; data: { items: AdminComment[]; total: number; totalPages: number }; message: string }
-
-      if (result.code === 2000 && result.data) {
-        setComments(result.data.items || [])
-        setTotalPages(result.data.totalPages || 1)
-      }
-    } catch {
-      setError('获取评论列表失败')
-    } finally {
-      setIsLoading(false)
-    }
+      const result = await api.get('/comments/admin', { page, pageSize: 20, ...(filter !== 'all' ? { status: filter } : {}) })
+      if (request !== requestId.current) return
+      if (result.code !== 2000 || !result.data) throw new Error(result.message || '获取评论失败')
+      const data = result.data as { items: AdminComment[]; total: number; totalPages: number }
+      if (page > Math.max(1, data.totalPages)) { setPage(Math.max(1, data.totalPages)); return }
+      setComments(data.items); setTotal(data.total); setPages(Math.max(1, data.totalPages))
+      setSelected(prev => new Set(Array.from(prev).filter(id => data.items.some(c => c.id === id))))
+    } catch (e) { if (request === requestId.current) setLoadError(e instanceof Error ? e.message : '加载失败，请重试') } finally { if (request === requestId.current) setLoading(false) }
+  }, [page, filter])
+  useEffect(() => { const sequence = requestId; if (!authLoading && isAuthenticated) void load(); return () => { sequence.current++ } }, [authLoading, isAuthenticated, load])
+  const filtered = comments.filter(c => `${c.content} ${c.nickname} ${c.email || ''} ${c.post?.title || ''}`.toLowerCase().includes(search.trim().toLowerCase()))
+  const current = page
+  const visible = filtered
+  const allSelected = visible.length > 0 && visible.every(c => selected.has(c.id))
+  useEffect(() => { if (selectAllRef.current) selectAllRef.current.indeterminate = !allSelected && visible.some(c => selected.has(c.id)) }, [allSelected, visible, selected])
+  function toggle(id: string) { setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
+  async function act(ids: string[], action: Action) {
+    if (busy || !ids.length || !can(action === 'delete' ? 'comment:delete' : action === 'approve' ? 'comment:approve' : 'comment:reject')) return
+    setBusy(true); setActionError(''); setSuccess('')
+    const results = await Promise.allSettled(ids.map(async id => {
+      const result = action === 'delete' ? await api.delete(`/comments/${id}`) : await api.put(`/comments/${id}/moderate`, { action })
+      if (result.code !== 2000) throw new Error(result.message || '操作失败')
+      return id
+    }))
+    const failed = ids.filter((_, index) => results[index].status === 'rejected')
+    const done = ids.filter((_, index) => results[index].status === 'fulfilled')
+    setSelected(prev => new Set(Array.from(prev).filter(id => !done.includes(id))))
+    if (failed.length) {
+      const first = results.find(r => r.status === 'rejected') as PromiseRejectedResult
+      setActionError(`${done.length ? `已完成 ${done.length} 条；` : ''}${failed.length} 条操作失败：${first.reason instanceof Error ? first.reason.message : '请重试'}。失败项保留选择。`)
+      setSelected(prev => new Set([...Array.from(prev), ...failed]))
+    } else setSuccess(`已${action === 'delete' ? '删除' : action === 'approve' ? '通过' : '拒绝'} ${done.length} 条评论。`)
+    setDeleting([]); setBusy(false); void load()
   }
-
-  const handleApprove = async (id: string) => {
-    try {
-      const result = await api.put(`/comments/${id}/moderate`, { action: 'approve' })
-      if (result.code === 2000) {
-        fetchComments()
-      }
-    } catch {
-      setError('审核操作失败')
-    }
-  }
-
-  const handleReject = async (id: string) => {
-    try {
-      const result = await api.put(`/comments/${id}/moderate`, { action: 'reject' })
-      if (result.code === 2000) {
-        fetchComments()
-      }
-    } catch {
-      setError('审核操作失败')
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这条评论吗？')) return
-
-    try {
-      const result = await api.delete(`/comments/${id}`)
-      if (result.code === 2000) {
-        fetchComments()
-      }
-    } catch {
-      setError('删除评论失败')
-    }
-  }
-
-  const handleBatchApprove = async () => {
-    if (selectedComments.size === 0) return
-
-    try {
-      const promises = Array.from(selectedComments).map(id =>
-        api.put(`/comments/${id}/moderate`, { action: 'approve' })
-      )
-      await Promise.all(promises)
-      setSelectedComments(new Set())
-      fetchComments()
-    } catch {
-      setError('批量审核失败')
-    }
-  }
-
-  const handleBatchDelete = async () => {
-    if (selectedComments.size === 0) return
-    if (!confirm(`确定要删除选中的 ${selectedComments.size} 条评论吗？`)) return
-
-    try {
-      const promises = Array.from(selectedComments).map(id =>
-        api.delete(`/comments/${id}`)
-      )
-      await Promise.all(promises)
-      setSelectedComments(new Set())
-      fetchComments()
-    } catch {
-      setError('批量删除失败')
-    }
-  }
-
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedComments)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedComments(newSelected)
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedComments.size === comments.length) {
-      setSelectedComments(new Set())
-    } else {
-      setSelectedComments(new Set(comments.map(c => c.id)))
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      PENDING: 'bg-yellow-100 text-yellow-700',
-      APPROVED: 'bg-green-100 text-green-700',
-      REJECTED: 'bg-red-100 text-red-700',
-    }
-    const labels = {
-      PENDING: '待审核',
-      APPROVED: '已通过',
-      REJECTED: '已拒绝',
-    }
-    return (
-      <span className={`px-2 py-1 text-xs rounded-full ${styles[status as keyof typeof styles]}`}>
-        {labels[status as keyof typeof labels] || status}
-      </span>
-    )
-  }
-
-  const maskIp = (ip?: string) => {
-    if (!ip) return '-'
-    const parts = ip.split('.')
-    if (parts.length === 4) {
-      return `${parts[0]}.${parts[1]}.*.*`
-    }
-    return ip
-  }
-
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">评论管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            审核和管理用户评论
-          </p>
-        </div>
-
-        {/* Batch Actions */}
-        {selectedComments.size > 0 && (
-          <div className="flex gap-2">
-            <PermissionGate permission="comment:approve"><button
-              onClick={handleBatchApprove}
-              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              批量通过 ({selectedComments.size})
-            </button></PermissionGate>
-            <PermissionGate permission="comment:delete"><button
-              onClick={handleBatchDelete}
-              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              批量删除
-            </button></PermissionGate>
-          </div>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Filter */}
-      <div className="flex gap-1 p-1 bg-sidebar rounded-lg w-fit">
-        {(['all', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => {
-              setFilter(f)
-              setPage(1)
-            }}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              filter === f
-                ? 'bg-background shadow-sm font-medium'
-                : 'hover:bg-background/50'
-            }`}
-          >
-            {f === 'all' ? '全部' : f === 'PENDING' ? '待审核' : f === 'APPROVED' ? '已通过' : '已拒绝'}
-          </button>
-        ))}
-      </div>
-
-      {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-sidebar">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium w-12">
-                <input
-                  type="checkbox"
-                  checked={selectedComments.size === comments.length && comments.length > 0}
-                  onChange={toggleSelectAll}
-                  className="rounded"
-                />
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-medium">内容</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">用户</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">文章</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">时间</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">IP</th>
-              <th className="px-4 py-3 text-right text-sm font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {comments.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                  暂无评论
-                </td>
-              </tr>
-            ) : (
-              comments.map((comment) => (
-                <tr key={comment.id} className="hover:bg-accent/50">
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedComments.has(comment.id)}
-                      onChange={() => toggleSelect(comment.id)}
-                      className="rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm line-clamp-2">{comment.content}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm">
-                      <p className="font-medium">{comment.nickname}</p>
-                      {comment.email && (
-                        <p className="text-muted-foreground text-xs">{comment.email}</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {comment.post ? (
-                      <Link
-                        href={`/admin/posts/${comment.post.id}`}
-                        className="text-sm text-primary hover:underline line-clamp-1"
-                      >
-                        {comment.post.title}
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {getStatusBadge(comment.status)}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">
-                    {new Date(comment.createdAt).toLocaleDateString('zh-CN')}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm font-mono">
-                    {maskIp(comment.ip)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {comment.status === 'PENDING' && (
-                      <>
-                        <PermissionGate permission="comment:approve"><button
-                          onClick={() => handleApprove(comment.id)}
-                          className="px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded transition-colors"
-                        >
-                          通过
-                        </button></PermissionGate>
-                        <PermissionGate permission="comment:reject"><button
-                          onClick={() => handleReject(comment.id)}
-                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
-                        >
-                          拒绝
-                        </button></PermissionGate>
-                      </>
-                    )}
-                    <PermissionGate permission="comment:delete"><button
-                      onClick={() => handleDelete(comment.id)}
-                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
-                    >
-                      删除
-                    </button></PermissionGate>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-3 py-1.5 border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            上一页
-          </button>
-          <span className="px-3 py-1.5 text-sm text-muted-foreground">
-            第 {page} / {totalPages} 页
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="px-3 py-1.5 border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            下一页
-          </button>
-        </div>
-      )}
-    </div>
-  )
+  const selectable = can('comment:approve') || can('comment:reject') || can('comment:delete')
+  return <div className="space-y-6"><AdminPageHeader title="评论管理" description="倾听读者的声音，让讨论保持友善。" />
+    {actionError && <p role="alert" className="admin-notice admin-notice-error">{actionError}</p>}{success && <p role="status" className="admin-notice">{success}</p>}
+    <AdminPanel><div className="admin-tabs" role="tablist" aria-label="评论状态">{Object.entries(labels).map(([key, label]) => <button role="tab" key={key} aria-selected={filter === key} disabled={busy} onClick={() => { setFilter(key as keyof typeof labels); setPage(1); setSelected(new Set()) }}>{label}</button>)}</div>
+      <div className="admin-toolbar"><AdminSearch value={search} onChange={v => { setSearch(v); setSelected(new Set()) }} placeholder="搜索本页评论、用户或文章…" />{selected.size > 0 && <div className="admin-row-actions"><span>已选 {selected.size} 条</span>{can('comment:approve') && <button disabled={busy} className="admin-btn admin-btn-primary" onClick={() => act(Array.from(selected), 'approve')}>批量通过</button>}{can('comment:reject') && <button disabled={busy} className="admin-btn admin-btn-secondary" onClick={() => act(Array.from(selected), 'reject')}>批量拒绝</button>}{can('comment:delete') && <button disabled={busy} className="admin-btn admin-btn-danger" onClick={() => setDeleting(Array.from(selected))}>批量删除</button>}</div>}</div>
+      {authLoading || loading ? <AdminState kind="loading" /> : loadError ? <AdminState kind="error" description={loadError} onRetry={load} /> : !filtered.length ? <AdminState kind="empty" title="暂无符合条件的评论" description="尝试其他筛选条件，或等待新的读者评论。" /> : <div className="admin-table-wrap"><table className="admin-table admin-table-mobile"><thead><tr>{selectable && <th><input ref={selectAllRef} type="checkbox" aria-label="选择本页全部评论" disabled={busy} checked={allSelected} onChange={() => setSelected(prev => { const next = new Set(prev); visible.forEach(c => allSelected ? next.delete(c.id) : next.add(c.id)); return next })} /></th>}<th>评论内容</th><th>用户</th><th>关联文章</th><th>状态</th><th>时间 / IP</th><th>操作</th></tr></thead><tbody>{visible.map(c => <tr key={c.id}>{selectable && <td data-label="选择"><input type="checkbox" aria-label={`选择 ${c.nickname} 的评论`} disabled={busy} checked={selected.has(c.id)} onChange={() => toggle(c.id)} /></td>}<td data-label="评论内容"><p style={{ maxWidth: 340, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{c.content}</p></td><td data-label="用户"><strong>{c.nickname}</strong><p className="text-xs text-muted-foreground">{c.email}</p></td><td data-label="关联文章">{c.post ? can('post:update') ? <Link href={`/admin/posts/${c.post.id}`}>{c.post.title}</Link> : c.post.title : '—'}</td><td data-label="状态"><AdminBadge tone={c.status === 'APPROVED' ? 'success' : c.status === 'PENDING' ? 'warning' : 'danger'}>{labels[c.status as keyof typeof labels] || c.status}</AdminBadge></td><td data-label="时间 / IP">{new Date(c.createdAt).toLocaleDateString('zh-CN')}<p className="text-xs text-muted-foreground">{c.ip?.includes('.') ? c.ip.split('.').slice(0, 2).join('.') + '.*.*' : c.ip ? c.ip.split(':').slice(0, 2).join(':') + ':*' : '—'}</p></td><td data-label="操作"><div className="admin-row-actions">{c.status !== 'APPROVED' && can('comment:approve') && <button disabled={busy} className="admin-btn admin-btn-ghost" onClick={() => act([c.id], 'approve')}>通过</button>}{c.status !== 'REJECTED' && can('comment:reject') && <button disabled={busy} className="admin-btn admin-btn-ghost" onClick={() => act([c.id], 'reject')}>拒绝</button>}{can('comment:delete') && <button disabled={busy} className="admin-btn admin-btn-danger" onClick={() => setDeleting([c.id])}>删除</button>}</div></td></tr>)}</tbody></table></div>}
+      {!loading && !loadError && <AdminPagination page={current} totalPages={pages} total={total} disabled={busy} onPageChange={p => { setPage(p); setSelected(new Set()) }} />}
+    </AdminPanel><AdminDialog open={deleting.length > 0} onClose={() => setDeleting([])} title="删除评论" description={`确定删除选中的 ${deleting.length} 条评论？此操作不可撤销。`} busy={busy}><div className="admin-dialog-footer"><button disabled={busy} className="admin-btn admin-btn-secondary" onClick={() => setDeleting([])}>取消</button><button disabled={busy} className="admin-btn admin-btn-danger" onClick={() => act(deleting, 'delete')}>{busy ? '删除中…' : '确认删除'}</button></div></AdminDialog>
+  </div>
 }

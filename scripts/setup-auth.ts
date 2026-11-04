@@ -1,12 +1,6 @@
 import { PrismaClient } from '@prisma/client'
-import { PERMISSIONS, type Permission } from '../src/shared/permissions'
-
-const roleGrants: Record<string, readonly Permission[]> = {
-  admin: PERMISSIONS,
-  editor: ['dashboard:view', 'post:read', 'post:create', 'post:update', 'post:delete', 'upload:create'],
-  reviewer: ['dashboard:view', 'comment:read', 'comment:approve', 'comment:reject'],
-  member: [],
-}
+import { PERMISSIONS } from '../src/shared/permissions'
+import { ROLE_DEFINITIONS } from '../src/shared/roles'
 
 class SetupInputError extends Error {}
 
@@ -25,15 +19,20 @@ export async function setupAuthorization(db: PrismaClient, adminEmail: string) {
       permissionIds.set(code, permission.id)
     }
     let adminRoleId = ''
-    for (const [name, grants] of Object.entries(roleGrants)) {
-      const role = await tx.role.upsert({ where: { name }, create: { name }, update: {} })
+    for (const [name, definition] of Object.entries(ROLE_DEFINITIONS)) {
+      const role = await tx.role.upsert({
+        where: { name },
+        create: {
+          name,
+          description: definition.description,
+          // Nested creates run only for a missing role; existing grants remain untouched.
+          rolePermissions: {
+            create: definition.defaultPermissions.map(code => ({ permissionId: permissionIds.get(code)! })),
+          },
+        },
+        update: {},
+      })
       if (name === 'admin') adminRoleId = role.id
-      for (const code of grants) {
-        const roleId_permissionId = { roleId: role.id, permissionId: permissionIds.get(code)! }
-        await tx.rolePermission.upsert({
-          where: { roleId_permissionId }, create: roleId_permissionId, update: {},
-        })
-      }
     }
     const userId_roleId = { userId: user.id, roleId: adminRoleId }
     await tx.userRole.upsert({ where: { userId_roleId }, create: userId_roleId, update: {} })

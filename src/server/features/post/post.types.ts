@@ -34,6 +34,7 @@ export interface PostListParams {
   pageSize?: number
   status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'DELETED' | null
   categoryId?: string
+  search?: string
   tagSlug?: string
 }
 

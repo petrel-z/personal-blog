@@ -22,8 +22,8 @@ test('the server refuses to render admin content for visitors', async () => {
 })
 
 test('members are sent to the access-denied page without rendering admin content', async () => {
-  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'member' } })
-  ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'member', deletedAt: null, userRoles: [] })
+  ;(auth as jest.Mock).mockResolvedValue({ user: { id: 'member', sessionVersion: 0 } })
+  ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'member', sessionVersion: 0, deletedAt: null, userRoles: [] })
   const { redirect } = require('next/navigation')
   redirect.mockImplementation((url: string) => { throw new Error(`REDIRECT:${url}`) })
   await expect(Promise.resolve().then(() => AdminLayout({ children: 'protected content' }))).rejects.toThrow('REDIRECT:/forbidden')
