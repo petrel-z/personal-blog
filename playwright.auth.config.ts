@@ -36,6 +36,7 @@ export default defineConfig({
     timeout: 120_000,
     env: { DATABASE_URL: testUrl, AUTH_URL: 'http://127.0.0.1:3017', AUTH_SECRET: process.env.AUTH_SECRET!,
       AUTH_CODE_SECRET: process.env.AUTH_CODE_SECRET!,
+      TENCENT_SECRET_ID: '', TENCENT_SECRET_KEY: '', APP_SCRECT_KEY: '',
       // These tests inject capture transports; never inherit a real SMTP destination.
       SMTP_HOST: '', SMTP_PORT: '', SMTP_SECURE: '', SMTP_USER: '', SMTP_PASSWORD: '', MAIL_FROM: '',
     },

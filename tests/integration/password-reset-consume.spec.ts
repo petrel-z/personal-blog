@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test'
 import bcrypt from 'bcryptjs'
 import { db, getCaptcha, login, makeUser, testPassword } from './auth-fixtures'
 import { prisma } from '../../src/server/db'
-import { issueCaptcha } from '../../src/server/features/auth/captcha.service'
+import { createTencentVerifier } from '../helpers/tencent-captcha'
 import { authDigest, emailKey } from '../../src/server/features/auth/identity'
 import * as reset from '../../src/server/features/auth/password-reset.service'
 import { createCaptureMailTransport } from '../helpers/capture-mail'
@@ -23,10 +23,10 @@ const emails: string[] = [], ips: string[] = [], captchaIds: string[] = []
 function address() { const value = `consume-${randomUUID()}@example.com`; emails.push(value); return value }
 function source() { const value = `198.19.${randomInt(256)}.${randomInt(1, 255)}`; ips.push(value); return value }
 async function send(email: string, ip = source()) {
-  const captcha = await issueCaptcha('password-reset'); captchaIds.push(captcha.id)
-  const captchaCode = Array.from(captcha.svg.matchAll(/<text\b[^>]*>([^<]+)<\/text>/g), match => match[1]).join('')
+  const verifier = createTencentVerifier()
+  const proof = verifier.issue()
   const mail = createCaptureMailTransport()
-  await reset.requestPasswordReset({ email, ip, captchaId: captcha.id, captchaCode }, { mail })
+  await reset.requestPasswordReset({ email, ip, ...proof }, { mail, verifyCaptcha: verifier.verify })
   return /验证码：(\d{6})/.exec(mail.messages[0].text)![1]
 }
 async function issued() {

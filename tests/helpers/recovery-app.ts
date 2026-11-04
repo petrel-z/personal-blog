@@ -15,7 +15,8 @@ export async function startRecoveryApp() {
   const smtp = await startCaptureSmtp('tls')
   const child = spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', '3018'], {
     detached: true, stdio: 'ignore', env: {
-      ...process.env, AUTH_URL: 'http://127.0.0.1:3018',
+      ...process.env, AUTH_URL: 'http://127.0.0.1:3018', NEXT_PUBLIC_CAPTCHA_APP_ID: '123456',
+      NEXT_DIST_DIR: '.next-ui-recovery', TENCENT_SECRET_ID: '', TENCENT_SECRET_KEY: '', APP_SCRECT_KEY: '',
       SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtp.port), SMTP_SECURE: 'true',
       SMTP_USER: 'test-user', SMTP_PASSWORD: 'test-password', MAIL_FROM: 'sender@example.com',
       NODE_EXTRA_CA_CERTS: resolve('tests/fixtures/smtp/localhost-cert.pem'),
@@ -38,7 +39,10 @@ export async function startRecoveryApp() {
       if (spawnError || child.exitCode !== null) throw new Error('Recovery test server could not start')
       try {
         const response = await fetch('http://127.0.0.1:3018/login', { signal: AbortSignal.timeout(2000) })
-        if (response.ok) return { smtp, close }
+        if (response.ok) {
+          const recovery = await fetch('http://127.0.0.1:3018/forgot-password', { signal: AbortSignal.timeout(20_000) })
+          if (recovery.ok) return { smtp, close }
+        }
       } catch {}
       await delay(250)
     }

@@ -66,6 +66,8 @@ test.each([
   { SMTP_PORT: '0' }, { SMTP_PORT: '65536' }, { SMTP_PORT: '587x' }, { SMTP_PORT: '587.5' },
   { SMTP_SECURE: 'yes' }, { SMTP_PORT: '465', SMTP_SECURE: 'false' }, { SMTP_PORT: '587', SMTP_SECURE: 'true' },
   { SMTP_HOST: 'smtp://smtp.example.com' }, { SMTP_HOST: 'smtp.example.com\r\nAUTH' },
+  { SMTP_PROXY: 'socks5://127.0.0.1:7897' }, { SMTP_PROXY: 'not-a-url' },
+  { SMTP_PROXY: 'http://127.0.0.1:7897/path' }, { SMTP_PROXY: 'http://127.0.0.1:7897?token=secret' },
   { MAIL_FROM: 'one@example.com,two@example.com' }, { MAIL_FROM: 'sender@example.com\r\nBcc: other@example.com' },
 ])('rejects invalid SMTP settings without contacting the server: %p', change => {
   expect(() => createMailTransport({ ...env, ...change })).toThrow(MailError)

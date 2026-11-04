@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff, Check } from 'lucide-react'
-import { useCaptcha } from '@/client/hooks/useCaptcha'
-import { CaptchaInput } from '@/app/(admin)/_components/CaptchaInput'
 import { resetPasswordFormSchema, resetRequestFormSchema } from '@/shared/validations'
-import { useTencentCaptcha } from '../../../client/hooks/useTencentCaptcha'
+import { TencentCaptchaError, useTencentCaptcha } from '@/client/hooks/useTencentCaptcha'
 
 const inputClass = 'w-full min-w-0'
 const buttonClass = 'admin-btn admin-btn-primary auth-submit'
+// Development must not restore a long cooldown saved under the production policy.
+const sendCooldownStorageKey = process.env.NODE_ENV === 'development'
+  ? 'password-reset:send-until:dev' : 'password-reset:send-until'
 
 /** Store only an expiry timestamp; no mailbox, challenge or credential is persisted. */
 function useCooldown(key: string) {
@@ -75,8 +76,7 @@ export function PasswordResetForm() {
   const [resending, setResending] = useState(false)
   const inFlight = useRef(false)
   const codeInput = useRef<HTMLInputElement>(null)
-  const captcha = useCaptcha('password-reset')
-  const sendingCooldown = useCooldown('password-reset:send-until')
+  const sendingCooldown = useCooldown(sendCooldownStorageKey)
   const checkingCooldown = useCooldown('password-reset:confirm-until')
 
   const tencentCaptcha = useTencentCaptcha()
@@ -86,42 +86,24 @@ export function PasswordResetForm() {
   async function send(event: FormEvent) {
     event.preventDefault()
     if (inFlight.current || !sendingCooldown.ready || sendingCooldown.seconds > 0) return
-    // const parsed = resetRequestFormSchema.safeParse({ email, captcha: captcha.value })
-    // const parsed = resetRequestFormSchema.safeParse({ email })
     const parsed = resetRequestFormSchema.shape.email.safeParse(email)
 
     if (!parsed.success) { setError(parsed.error.issues[0].message); return }
-    // if (!captcha.id || captcha.loading) { setError('请刷新图片验证码后重试'); return }
     inFlight.current = true
     setBusy('send')
     setError('')
     try {
-      console.log('Opening Tencent Captcha')
-      const res = await tencentCaptcha.openCaptcha()
-      const re = await fetch('/api/auth/password-reset/tencent-captcha', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket: res.ticket, randstr: res.randstr }),
-      })
-      const data = await re.json()
-      if (!data || data.code !== 2000) {
-        setError('人机验证失败，请刷新页面后重试')
-        return
-      }
-      const result = await submitReset('request', { email: email })
-      // if (result.ok || result.limited) sendingCooldown.start(result.retryAfter)
-      // if (!result.ok) { setError(result.message); return }
-      setEmail(email)
-      setNotice(data.message)
+      const proof = await tencentCaptcha.openCaptcha()
+      const result = await submitReset('request', { email: parsed.data, ticket: proof.ticket, randstr: proof.randstr })
+      if (result.ok || result.limited) sendingCooldown.start(result.retryAfter)
+      if (!result.ok) { setError(result.message); return }
+      setEmail(parsed.data)
+      setNotice(result.message)
       setCode('')
       setResending(false)
       setStep('confirm')
-    } catch { setError('网络或服务异常，请稍后重试') }
-    finally {
-      await captcha.refresh()
-      inFlight.current = false
-      setBusy(null)
-    }
+    } catch (error) { setError(error instanceof TencentCaptchaError ? error.message : '网络或服务异常，请稍后重试') }
+    finally { inFlight.current = false; setBusy(null) }
   }
 
   async function confirm(event: FormEvent) {
@@ -172,11 +154,7 @@ export function PasswordResetForm() {
             <input id="recovery-email" type="email" autoComplete="email" maxLength={254} required
               value={email} onChange={event => setEmail(event.target.value)} placeholder="请输入注册时使用的邮箱" className={inputClass} />
           </div>
-          {/* <div className="admin-field">
-            <label htmlFor="captcha" className="auth-recovery-label">图片验证码</label>
-            <CaptchaInput captcha={captcha} />
-          </div> */}
-          <button type="submit" className={buttonClass} disabled={!!busy || !sendingCooldown.ready || sendingCooldown.seconds > 0 || captcha.loading || !captcha.id}>
+          <button type="submit" className={buttonClass} disabled={!!busy || !sendingCooldown.ready || sendingCooldown.seconds > 0}>
             {busy === 'send' ? '发送中…' : sendingCooldown.seconds > 0 ? `${sendingCooldown.seconds} 秒后可发送` : '发送邮件验证码'}
           </button>
           <button type="button" onClick={useExistingCode} className="admin-btn admin-btn-ghost auth-recovery-existing">已有邮件验证码</button>
@@ -221,17 +199,16 @@ export function PasswordResetForm() {
         <div className="auth-recovery-resend">
           <div className="auth-recovery-actions">
             <button type="button" disabled={!!busy || sendingCooldown.seconds > 0 || !sendingCooldown.ready}
-              onClick={() => { setError(''); setResending(true); void captcha.refresh() }} className="admin-btn admin-btn-ghost">
+              onClick={() => { setError(''); setResending(true) }} className="admin-btn admin-btn-ghost">
               {sendingCooldown.seconds > 0 ? `${sendingCooldown.seconds} 秒后可重发` : '重新发送'}
             </button>
             <button type="button" disabled={!!busy} className="admin-btn admin-btn-ghost"
-              onClick={() => { setStep('request'); setError(''); setNotice(''); setCode(''); setNewPassword(''); setConfirmPassword(''); setResending(false); void captcha.refresh() }}>更换邮箱</button>
+              onClick={() => { setStep('request'); setError(''); setNotice(''); setCode(''); setNewPassword(''); setConfirmPassword(''); setResending(false) }}>更换邮箱</button>
           </div>
           {resending && <form onSubmit={send} noValidate className="auth-form">
             <fieldset disabled={!!busy} className="auth-form min-w-0">
-              <label htmlFor="captcha" className="auth-recovery-label">重新发送前，请填写新的图片验证码</label>
-              <CaptchaInput captcha={captcha} />
-              <button type="submit" disabled={!!busy || sendingCooldown.seconds > 0 || captcha.loading || !captcha.id} className={buttonClass}>
+              <p className="text-sm text-muted-foreground">重新发送需要再次完成人机验证。</p>
+              <button type="submit" disabled={!!busy || sendingCooldown.seconds > 0} className={buttonClass}>
                 {busy === 'send' ? '发送中…' : '发送新验证码'}
               </button>
             </fieldset>

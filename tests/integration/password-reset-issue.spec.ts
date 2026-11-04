@@ -3,27 +3,26 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { resolve } from 'node:path'
 import { test, expect } from '@playwright/test'
-import { db, getCaptcha, makeUser } from './auth-fixtures'
+import { db, makeUser } from './auth-fixtures'
 import { prisma } from '../../src/server/db'
-import { issueCaptcha } from '../../src/server/features/auth/captcha.service'
+import { createTencentVerifier } from '../helpers/tencent-captcha'
 import { authDigest, emailKey } from '../../src/server/features/auth/identity'
-import { requestPasswordReset } from '../../src/server/features/auth/password-reset.service'
+import { requestPasswordReset as realRequestPasswordReset } from '../../src/server/features/auth/password-reset.service'
 import { createCaptureMailTransport } from '../helpers/capture-mail'
 import { startCaptureSmtp } from '../helpers/capture-smtp'
 import { MailError, type MailTransport } from '../../src/server/mail/types'
 
+const verifier = createTencentVerifier()
+const requestPasswordReset: typeof realRequestPasswordReset = (input, deps) => realRequestPasswordReset(input, { ...deps, verifyCaptcha: verifier.verify })
+
 const secret = 'isolated-password-reset-secret-32-bytes-minimum'
 const emails: string[] = []
 const ips: string[] = []
-const captchaIds: string[] = []
 const previousSecret = process.env.AUTH_CODE_SECRET
 function email() { const value = `reset-${randomUUID()}@example.com`; emails.push(value); return value }
 function ip() { const value = `198.18.${randomInt(256)}.${randomInt(1, 255)}`; ips.push(value); return value }
-async function input(address: string, source = ip(), purpose: 'password-reset' | 'login' = 'password-reset') {
-  const captcha = await issueCaptcha(purpose)
-  captchaIds.push(captcha.id)
-  return { email: address, ip: source, captchaId: captcha.id,
-    captchaCode: Array.from(captcha.svg.matchAll(/<text\b[^>]*>([^<]+)<\/text>/g), match => match[1]).join('') }
+async function input(address: string, source = ip(), accepted = true) {
+  return { email: address, ip: source, ...verifier.issue(accepted) }
 }
 async function row(address: string) { return db.passwordResetChallenge.findUniqueOrThrow({ where: { emailKey: emailKey(address) } }) }
 async function allowResend(address: string) {
@@ -37,9 +36,8 @@ test.afterEach(async () => {
     ...emails.map(value => `reset:send:email:${emailKey(value)}`),
     ...ips.map(value => `reset:send:ip:${authDigest('password-reset-ip', value)}`),
   ] } } })
-  await db.captchaChallenge.deleteMany({ where: { id: { in: captchaIds } } })
   await db.user.deleteMany({ where: { email: { in: emails } } })
-  emails.length = 0; ips.length = 0; captchaIds.length = 0
+  emails.length = 0; ips.length = 0
   if (previousSecret === undefined) delete process.env.AUTH_CODE_SECRET
   else process.env.AUTH_CODE_SECRET = previousSecret
 })
@@ -86,10 +84,10 @@ test('existing, unknown and soft-deleted addresses share the same response and r
   }
 })
 
-test('image captcha is purpose-bound and one-use, including when later issuance fails', async () => {
+test('rejected or reused Tencent tickets cannot send mail, including when later issuance fails', async () => {
   const address = email()
   const mail = createCaptureMailTransport()
-  const wrongPurpose = await input(address, ip(), 'login')
+  const wrongPurpose = await input(address, ip(), false)
   await expect(requestPasswordReset(wrongPurpose, { mail })).rejects.toMatchObject({ reason: 'captcha' })
   expect(await db.passwordResetChallenge.count({ where: { emailKey: emailKey(address) } })).toBe(0)
   const valid = await input(address)
@@ -117,8 +115,10 @@ test('resend opens after sixty seconds and replaces the old digest without clear
   const mail = createCaptureMailTransport()
   await requestPasswordReset(await input(user.email), { mail })
   const old = await row(user.email)
-  await db.passwordResetChallenge.update({ where: { emailKey: old.emailKey }, data: { sentAt: new Date(Date.now() - 59_500) } })
-  await expect(requestPasswordReset(await input(user.email), { mail })).rejects.toMatchObject({ reason: 'limited', retryAfterSeconds: 1 })
+  // Exact remaining seconds are covered with a frozen clock in the unit tests.
+  // Leave time for real database round trips before checking the blocked request.
+  await db.passwordResetChallenge.update({ where: { emailKey: old.emailKey }, data: { sentAt: new Date(Date.now() - 30_000) } })
+  await expect(requestPasswordReset(await input(user.email), { mail })).rejects.toMatchObject({ reason: 'limited' })
   await allowResend(user.email)
   await requestPasswordReset(await input(user.email), { mail })
   const latest = await row(user.email)
@@ -205,17 +205,15 @@ for (const finish of ['success', 'failure']) {
   })
 }
 
-test('HTTP rejects invalid captcha and returns the same unavailable response for existing and unknown mailboxes without SMTP configuration', async ({ request }) => {
+test('HTTP requires Tencent tickets and returns the same unavailable response for existing and unknown mailboxes without cloud configuration', async ({ request }) => {
   const user = await makeUser(email())
   const source = ip()
   expect((await request.post('/api/auth/password-reset/request', { data: { email: user.email } })).status()).toBe(400)
   expect((await request.post('/api/auth/password-reset/request', { data: '{' })).status()).toBe(400)
   const results = []
   for (const address of [user.email, email()]) {
-    const captcha = await getCaptcha(request, 'password-reset')
-    captchaIds.push(captcha.id)
     const response = await request.post('/api/auth/password-reset/request', {
-      headers: { 'x-forwarded-for': source }, data: { email: address, captchaId: captcha.id, captchaCode: captcha.code },
+      headers: { 'x-forwarded-for': source }, data: { email: address, ...verifier.issue() },
     })
     expect(response.status()).toBe(503)
     expect(response.headers()['cache-control']).toBe('private, no-store')
@@ -225,19 +223,40 @@ test('HTTP rejects invalid captcha and returns the same unavailable response for
   expect(results[0]).toEqual(results[1])
 })
 
-test('HTTP rate limiting derives IP from request context and ignores a forged body IP', async ({ request }) => {
+test('verified requests are subject to the source IP send quota before any email challenge is created', async () => {
   const source = ip()
   await db.authRateBucket.create({ data: { key: `reset:send:ip:${authDigest('password-reset-ip', source)}`, count: 20, windowStart: new Date() } })
   const address = email()
-  const captcha = await getCaptcha(request, 'password-reset')
-  captchaIds.push(captcha.id)
-  const response = await request.post('/api/auth/password-reset/request', {
-    headers: { 'x-forwarded-for': source }, data: { email: address, captchaId: captcha.id, captchaCode: captcha.code, ip: ip() },
-  })
-  expect(response.status()).toBe(429)
-  expect(Number(response.headers()['retry-after'])).toBeGreaterThan(0)
-  expect((await response.json()).data.retryAfterSeconds).toBeGreaterThan(0)
+  await expect(requestPasswordReset(await input(address, source), { mail: createCaptureMailTransport() }))
+    .rejects.toMatchObject({ reason: 'limited' })
   expect(await db.passwordResetChallenge.count({ where: { emailKey: emailKey(address) } })).toBe(0)
+})
+
+test('development reopens a full email send quota after sixty seconds and returns a five-second cooldown', async () => {
+  const previousEnv = process.env
+  process.env = { ...previousEnv, NODE_ENV: 'development' }
+  const address = email()
+  const bucket = `reset:send:email:${emailKey(address)}`
+  const mail = createCaptureMailTransport()
+  try {
+    await db.authRateBucket.create({ data: { key: bucket, count: 5, windowStart: new Date(Date.now() - 61_000) } })
+    expect(await requestPasswordReset(await input(address), { mail })).toMatchObject({ retryAfterSeconds: 5 })
+    expect((await db.authRateBucket.findUniqueOrThrow({ where: { key: bucket } })).count).toBe(1)
+  } finally { process.env = previousEnv }
+})
+
+test('production keeps a full email send quota blocked after sixty seconds', async () => {
+  const previousEnv = process.env
+  process.env = { ...previousEnv, NODE_ENV: 'production' }
+  const address = email()
+  const bucket = `reset:send:email:${emailKey(address)}`
+  const mail = createCaptureMailTransport()
+  try {
+    await db.authRateBucket.create({ data: { key: bucket, count: 5, windowStart: new Date(Date.now() - 61_000) } })
+    await expect(requestPasswordReset(await input(address), { mail })).rejects.toMatchObject({ reason: 'limited' })
+    expect((await db.authRateBucket.findUniqueOrThrow({ where: { key: bucket } })).count).toBe(5)
+    expect(mail.messages).toEqual([])
+  } finally { process.env = previousEnv }
 })
 
 test('the actual request route verifies SMTP, delivers over TLS and returns no code or account identifier', async () => {
@@ -246,6 +265,11 @@ test('the actual request route verifies SMTP, delivers over TLS and returns no c
     const user = await makeUser(email())
     const data = await input(user.email)
     const { stdout, stderr } = await promisify(execFile)(process.execPath, ['--import', 'tsx', '-e', `
+      const {captcha}=require('tencentcloud-sdk-nodejs-captcha');
+      const proof=JSON.parse(process.argv[1]);
+      captcha.v20190722.Client.prototype.DescribeCaptchaResult=async request => ({
+        CaptchaCode: request.Ticket===proof.ticket && request.Randstr===proof.randstr ? 1 : 7
+      });
       const {POST}=require('./src/app/api/auth/password-reset/request/route.ts');
       const {prisma}=require('./src/server/db');
       (async()=>{try {
@@ -256,7 +280,8 @@ test('the actual request route verifies SMTP, delivers over TLS and returns no c
         console.log(JSON.stringify({status:response.status,cache:response.headers.get('cache-control'),body:await response.json()}));
       } finally {await prisma.$disconnect()}})();
     `, JSON.stringify(data)], { timeout: 20_000, env: {
-      ...process.env, NODE_ENV: 'test', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_SECURE: 'true',
+      ...process.env, NODE_ENV: 'test', TENCENT_SECRET_ID: 'test-id', TENCENT_SECRET_KEY: 'test-key',
+      NEXT_PUBLIC_CAPTCHA_APP_ID: '123456', APP_SCRECT_KEY: 'test-app-key', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_SECURE: 'true',
       SMTP_USER: 'test-user', SMTP_PASSWORD: 'test-password', MAIL_FROM: 'sender@example.com',
       NODE_EXTRA_CA_CERTS: resolve('tests/fixtures/smtp/localhost-cert.pem'),
     } })

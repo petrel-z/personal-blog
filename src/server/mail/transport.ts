@@ -17,6 +17,7 @@ function createSmtpClient(config: ReturnType<typeof readMailConfig>) {
       host: config.host,
       port: config.port,
       secure: config.secure,
+      ...(config.proxy ? { proxy: config.proxy } : {}),
       requireTLS: !config.secure,
       tls: { rejectUnauthorized: true, minVersion: 'TLSv1.2', ...(!isIP(config.host) ? { servername: config.host } : {}) },
       auth: { user: config.user, pass: config.password },

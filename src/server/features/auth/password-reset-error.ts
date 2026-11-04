@@ -1,6 +1,6 @@
 const messages = {
-  invalid: '邮箱或图片验证码格式无效',
-  captcha: '图片验证码错误或已过期',
+  invalid: '邮箱或人机验证参数无效',
+  captcha: '人机验证失败或已过期，请重新验证',
   limited: '申请过于频繁，请稍后重试',
   unavailable: '密码找回服务暂时不可用',
   invalid_confirmation: '邮箱、邮件验证码或新密码格式无效',

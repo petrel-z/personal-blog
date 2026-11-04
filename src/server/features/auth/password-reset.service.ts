@@ -4,7 +4,7 @@ import { prisma } from '@/server/db'
 import type { MailTransport } from '@/server/mail/types'
 import { createMailTransport } from '@/server/mail/transport'
 import { buildResetCodeMail } from '@/server/mail/templates'
-import { consumeCaptcha } from './captcha.service'
+import { tencentChallengeSchema, verifyTencentCaptcha } from './tencent-captcha.service'
 import { authDigest, emailKey, normalizeEmail } from './identity'
 import { consumeQuota } from './rate-limit.service'
 import { generateResetCode, hashResetCode, readResetCodeSecret } from './password-reset-code'
@@ -13,31 +13,31 @@ import { resetIpSchema } from './password-reset-input'
 
 export { confirmPasswordReset } from './password-reset-confirm.service'
 
-const requestSchema = z.object({
+const requestSchema = tencentChallengeSchema.extend({
   email: z.string().trim().email().max(254).transform(normalizeEmail),
-  // captchaId: z.string().min(1).max(64),
-  // captchaCode: z.string().regex(/^[a-z0-9]{4}$/i),
   ip: resetIpSchema,
 })
 
-const resendSeconds = 60
 const lifetimeMs = 10 * 60_000
 
-export async function requestPasswordReset(input: unknown, deps: { mail?: MailTransport } = {}) {
+export async function requestPasswordReset(input: unknown, deps: {
+  mail?: MailTransport; verifyCaptcha?: typeof verifyTencentCaptcha
+} = {}) {
   const parsed = requestSchema.safeParse(input)
   if (!parsed.success) throw new PasswordResetError('invalid')
-  const { email, ip } = parsed.data
-  // if (!await consumeCaptcha({ id: captchaId, code: captchaCode, purpose: 'password-reset' })) {
-  //   throw new PasswordResetError('captcha')
-  // }
+  const development = process.env.NODE_ENV === 'development'
+  const resendSeconds = development ? 5 : 60
+  const quotaWindowSeconds = development ? 60 : 3600
+  const { email, ip, ticket, randstr } = parsed.data
   const secret = readResetCodeSecret()
+  await (deps.verifyCaptcha ?? verifyTencentCaptcha)({ ticket, randstr, ip })
   const key = emailKey(email)
   // Charge valid attempts (including cooldown retries) equally for all addresses.
   for (const [bucket, limit] of [
     [`reset:send:ip:${authDigest('password-reset-ip', ip)}`, 20],
     [`reset:send:email:${key}`, 5],
   ] as const) {
-    const quota = await consumeQuota(bucket, limit, 3600)
+    const quota = await consumeQuota(bucket, limit, quotaWindowSeconds)
     if (!quota.allowed) throw new PasswordResetError('limited', quota.retryAfterSeconds)
   }
 

@@ -4,6 +4,11 @@ import { db, makeUser } from '../integration/auth-fixtures'
 import { setupAuthorization } from '../../scripts/setup-auth'
 import { authDigest, emailKey } from '../../src/server/features/auth/identity'
 import { startRecoveryApp, capturedResetCode } from '../helpers/recovery-app'
+import { createTencentVerifier } from '../helpers/tencent-captcha'
+import { requestPasswordReset } from '../../src/server/features/auth/password-reset.service'
+import { PasswordResetError } from '../../src/server/features/auth/password-reset-error'
+import { createMailTransport } from '../../src/server/mail/transport'
+import { prisma } from '../../src/server/db'
 
 let app: Awaited<ReturnType<typeof startRecoveryApp>>
 let email: string, ip: string
@@ -11,8 +16,8 @@ let captchaIds: string[] = []
 const password = 'Recovered-password-29!'
 
 test.beforeAll(async () => { test.setTimeout(120_000); app = await startRecoveryApp() })
-test.afterAll(async () => { await app?.close(); await db.$disconnect() })
-test.beforeEach(async ({ context }) => {
+test.afterAll(async () => { await app?.close(); await Promise.all([db.$disconnect(), prisma.$disconnect()]) })
+test.beforeEach(async ({ context, page }) => {
   captchaIds = []
   context.on('response', response => {
     const id = response.headers()['x-captcha-id']
@@ -22,6 +27,31 @@ test.beforeEach(async ({ context }) => {
   ip = `198.18.${randomInt(256)}.${randomInt(1, 255)}`
   await makeUser(email)
   await context.setExtraHTTPHeaders({ 'X-Forwarded-For': ip })
+  const verifier = createTencentVerifier()
+  await page.route('https://turing.captcha.qcloud.com/TJCaptcha.js', route => {
+    const proofs = Array.from({ length: 10 }, () => verifier.issue())
+    return route.fulfill({ contentType: 'application/javascript', body: `window.TencentCaptcha = class {
+      constructor(id, callback) { this.callback = callback }
+      show() { this.callback({ret: 0, ...(${JSON.stringify(proofs)})[window.ticketIndex = (window.ticketIndex || 0) + 1]}) }
+      destroy() {}
+    }` })
+  })
+  // Stub the cloud boundary; retain real database, rate limits and loopback TLS SMTP.
+  // The production HTTP route and SDK contract are covered by Jest tests.
+  await page.route('**/api/auth/password-reset/request', async route => {
+    const mail = createMailTransport({ SMTP_HOST: '127.0.0.1', SMTP_PORT: String(app.smtp.port), SMTP_SECURE: 'true',
+      SMTP_USER: 'test-user', SMTP_PASSWORD: 'test-password', MAIL_FROM: 'sender@example.com' })
+    try {
+      const result = await requestPasswordReset({ ...route.request().postDataJSON(),
+        ip: route.request().headers()['x-forwarded-for'] ?? 'unknown' }, { mail, verifyCaptcha: verifier.verify })
+      await route.fulfill({ json: { code: 2000, message: result.message, data: { retryAfterSeconds: result.retryAfterSeconds } } })
+    } catch (error) {
+      if (!(error instanceof PasswordResetError)) throw error
+      const status = error.reason === 'limited' ? 429 : error.reason === 'unavailable' ? 503 : 400
+      await route.fulfill({ status, json: { code: status * 10, message: error.message,
+        data: status === 429 ? { retryAfterSeconds: error.retryAfterSeconds } : null } })
+    }
+  })
 })
 test.afterEach(async () => {
   const key = emailKey(email)
@@ -45,7 +75,6 @@ async function fillCaptcha(page: Page) {
 async function sendCode(page: Page) {
   await page.goto('/forgot-password')
   await page.getByLabel('注册邮箱', { exact: true }).fill(email)
-  await fillCaptcha(page)
   await page.getByRole('button', { name: '发送邮件验证码', exact: true }).click()
   await expect(page.getByLabel('邮件验证码', { exact: true })).toBeVisible()
   const message = app.smtp.messages.filter(message => message.includes(`To: ${email}`)).at(-1)!
@@ -63,6 +92,7 @@ async function assertPrivateStorage(page: Page, code: string) {
 }
 
 test('login links to recovery; a real SMTP code resets the password and permits login', async ({ page }) => {
+  test.setTimeout(60_000)
   await setupAuthorization(db, email)
   await page.goto('/login')
   await page.getByRole('link', { name: '忘记密码？' }).click()
@@ -77,8 +107,11 @@ test('login links to recovery; a real SMTP code resets the password and permits 
   await page.getByLabel('邮箱', { exact: true }).fill(email)
   await page.getByLabel('密码', { exact: true }).fill(password)
   await fillCaptcha(page)
+  const accessReady = page.waitForResponse(response => response.url().includes('/api/auth/access?'))
   await page.getByRole('button', { name: '登录', exact: true }).click()
-  await expect(page).toHaveURL('http://127.0.0.1:3018/admin/dashboard')
+  expect(await (await accessReady).json()).toMatchObject({ data: { destination: '/admin/dashboard' } })
+  // The dedicated development server compiles the protected dashboard on first entry.
+  await expect(page).toHaveURL('http://127.0.0.1:3018/admin/dashboard', { timeout: 20_000 })
   expect((await (await page.request.get('/api/auth/session')).json()).user.email).toBe(email)
   expect((await db.user.findUniqueOrThrow({ where: { email } })).sessionVersion).toBe(1)
 })
@@ -124,15 +157,13 @@ test('refresh retains the cooldown without persisting email, code or password; a
   await expect(page.getByRole('status')).toContainText('密码重置成功')
 })
 
-test('resending requires a fresh picture captcha and honors the server cooldown', async ({ page }) => {
+test('resending requires a fresh Tencent ticket and honors the server cooldown', async ({ page }) => {
   await page.clock.install()
   await sendCode(page)
   await expect(page.getByRole('button', { name: /秒后可重发/ })).toBeDisabled()
   await db.passwordResetChallenge.update({ where: { emailKey: emailKey(email) }, data: { sentAt: new Date(Date.now() - 61_000) } })
   await page.clock.fastForward(61_000)
   await page.getByRole('button', { name: '重新发送', exact: true }).click()
-  await expect(page.getByPlaceholder('验证码', { exact: true })).toHaveValue('')
-  await fillCaptcha(page)
   await page.getByRole('button', { name: '发送新验证码', exact: true }).click()
   await expect(page.getByRole('button', { name: /秒后可重发/ })).toBeDisabled()
   const messages = app.smtp.messages.filter(message => message.includes(`To: ${email}`))
@@ -142,18 +173,13 @@ test('resending requires a fresh picture captcha and honors the server cooldown'
   await expect(page.getByRole('status')).toContainText('密码重置成功')
 })
 
-test('network failures refresh consumed captcha and allow send and confirmation retries', async ({ page }) => {
+test('network failures obtain new Tencent tickets and allow send and confirmation retries', async ({ page }) => {
   await page.goto('/forgot-password')
   await page.getByLabel('注册邮箱', { exact: true }).fill(email)
-  await fillCaptcha(page)
-  const image = await page.getByRole('img', { name: '验证码', exact: true }).getAttribute('src')
   await page.route('**/api/auth/password-reset/request', route => route.abort(), { times: 1 })
   await page.getByRole('button', { name: '发送邮件验证码', exact: true }).click()
   await expect(page.getByRole('main').getByRole('alert')).toContainText('网络')
-  await expect(page.getByPlaceholder('验证码', { exact: true })).toHaveValue('')
-  await expect(page.getByRole('img', { name: '验证码', exact: true })).not.toHaveAttribute('src', image!)
   await expect(page.getByLabel('注册邮箱', { exact: true })).toHaveValue(email)
-  await fillCaptcha(page)
   await page.getByRole('button', { name: '发送邮件验证码', exact: true }).click()
   await expect(page.getByLabel('邮件验证码', { exact: true })).toBeVisible()
   const code = capturedResetCode(app.smtp.messages.filter(message => message.includes(`To: ${email}`)).at(-1)!)
@@ -169,10 +195,9 @@ test('a slow submission cannot send duplicate mail', async ({ page }) => {
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
   let count = 0
-  await page.route('**/api/auth/password-reset/request', async route => { count++; await gate; await route.continue() })
+  await page.route('**/api/auth/password-reset/request', async route => { count++; await gate; await route.fallback() })
   await page.goto('/forgot-password')
   await page.getByLabel('注册邮箱', { exact: true }).fill(email)
-  await fillCaptcha(page)
   const button = page.getByRole('button', { name: '发送邮件验证码', exact: true })
   await button.evaluate(button => { const form = (button as HTMLButtonElement).form!; form.requestSubmit(); form.requestSubmit() })
   await expect(page.getByRole('button', { name: '发送中…', exact: true })).toBeDisabled()
@@ -185,12 +210,10 @@ test('a slow submission cannot send duplicate mail', async ({ page }) => {
 test('unavailable mail stays on the first step; server limits show a persistent retry countdown', async ({ page }) => {
   await page.goto('/forgot-password')
   await page.getByLabel('注册邮箱', { exact: true }).fill(email)
-  await fillCaptcha(page)
   await page.route('**/api/auth/password-reset/request', route => route.fulfill({ status: 503, json: { code: 5030, message: '密码找回服务暂时不可用', data: null } }), { times: 1 })
   await page.getByRole('button', { name: '发送邮件验证码', exact: true }).click()
   await expect(page.getByRole('main').getByRole('alert')).toContainText('暂时不可用')
   await expect(page.getByLabel('邮件验证码', { exact: true })).toHaveCount(0)
-  await fillCaptcha(page)
   await page.route('**/api/auth/password-reset/request', route => route.fulfill({ status: 429, headers: { 'Retry-After': '120' }, json: { code: 4290, message: '申请过于频繁，请稍后重试', data: { retryAfterSeconds: 120 } } }), { times: 1 })
   await page.getByRole('button', { name: '发送邮件验证码', exact: true }).click()
   await expect(page.getByRole('button', { name: /秒后可发送/ })).toBeDisabled()

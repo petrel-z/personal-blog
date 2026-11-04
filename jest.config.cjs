@@ -2,6 +2,7 @@ const nextJest = require('next/jest')
 
 const createConfig = nextJest({ dir: './' })({
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/tests/setup-env.cjs'],
   testMatch: ['<rootDir>/tests/**/*.test.ts'],
   moduleNameMapper: {
     '^@/auth$': '<rootDir>/auth.ts',

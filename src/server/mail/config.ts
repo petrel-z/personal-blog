@@ -2,6 +2,17 @@ import { isIP } from 'node:net'
 import { z } from 'zod'
 import { MailError } from './types'
 
+const proxySchema = z.preprocess(
+  value => typeof value === 'string' && !value.trim() ? undefined : value,
+  z.string().trim().max(2048).url().refine(value => {
+    try {
+      const url = new URL(value)
+      return ['http:', 'https:'].includes(url.protocol) && !/[\r\n]/.test(value) &&
+        url.pathname === '/' && !url.search && !url.hash
+    } catch { return false }
+  }).optional(),
+)
+
 const configSchema = z.object({
   SMTP_HOST: z.string().trim().min(1).max(253).refine(host => isIP(host) !== 0 ||
     host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label))),
@@ -9,6 +20,7 @@ const configSchema = z.object({
   SMTP_SECURE: z.enum(['true', 'false']).transform(value => value === 'true'),
   SMTP_USER: z.string().trim().min(1),
   SMTP_PASSWORD: z.string().min(1), // Whitespace can be part of an SMTP password.
+  SMTP_PROXY: proxySchema,
   MAIL_FROM: z.string().trim().email().max(254),
 }).refine(config => !(config.SMTP_PORT === 465 && !config.SMTP_SECURE) &&
   !(config.SMTP_PORT === 587 && config.SMTP_SECURE))
@@ -24,5 +36,6 @@ export function readMailConfig(env: Record<string, string | undefined> = process
     user: config.SMTP_USER,
     password: config.SMTP_PASSWORD,
     from: config.MAIL_FROM,
+    ...(config.SMTP_PROXY ? { proxy: config.SMTP_PROXY } : {}),
   }
 }
