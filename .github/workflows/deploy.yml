@@ -116,6 +116,4 @@ jobs:
             --base main \
             --head dev \
             --title "Automated PR: Merge dev to main" \
-            --body-file "$body_file" \
-            --label automated-pr \
-            --label merge
+            --body-file "$body_file"
