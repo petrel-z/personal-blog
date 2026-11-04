@@ -56,6 +56,13 @@ jobs:
           username: root
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
+            set -eu
+            export PATH="/opt/node/node-v20.19.6-linux-x64/bin:$PATH"
+
+            for tool in node corepack pnpm pm2; do
+              command -v "$tool"
+            done
+
             cd /root/blog
             git pull origin main
             corepack enable
